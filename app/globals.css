@@ -3,7 +3,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Premium enterprise theme with emerald accent */
 :root {
   --background: 0 0% 100%;
   --foreground: 240 10% 4%;
@@ -127,6 +126,14 @@
   --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
   --color-sidebar-border: hsl(var(--sidebar-border));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  /* Custom animation keyframes using percentage syntax */
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
+  --animate-slide-up: slide-up 0.6s ease-out;
+  --animate-slide-down: slide-down 0.6s ease-out;
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-bounce-subtle: bounce-subtle 2s ease-in-out infinite;
 }
 
 @layer base {
@@ -136,13 +143,11 @@
   body {
     @apply bg-background text-foreground;
   }
-  /* RTL Support */
   [dir="rtl"] {
     font-family: var(--font-arabic);
   }
 }
 
-/* Custom scrollbar */
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
@@ -162,115 +167,103 @@
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background-color: hsl(var(--muted-foreground) / 0.5);
   }
-}
 
-/* Animations */
-@keyframes fade-in {
-  from {
-    opacity: 0;
+  /* Custom animation utilities */
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
   }
-  to {
-    opacity: 1;
+  .animate-float-delayed {
+    animation: float 6s ease-in-out infinite;
+    animation-delay: 2s;
   }
-}
-
-@keyframes slide-in-from-top {
-  from {
-    transform: translateY(-10px);
-    opacity: 0;
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
   }
-  to {
-    transform: translateY(0);
-    opacity: 1;
+  .animate-slide-up {
+    animation: slide-up 0.6s ease-out forwards;
   }
-}
-
-@keyframes slide-in-from-bottom {
-  from {
-    transform: translateY(10px);
-    opacity: 0;
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out forwards;
   }
-  to {
-    transform: translateY(0);
-    opacity: 1;
+  .animate-bounce-subtle {
+    animation: bounce-subtle 2s ease-in-out infinite;
+  }
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-shift 3s ease infinite;
   }
 }
 
-@keyframes slide-in-from-left {
-  from {
-    transform: translateX(-10px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slide-in-from-right {
-  from {
-    transform: translateX(10px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes scale-in {
-  from {
-    transform: scale(0.95);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes pulse-soft {
+/* Keyframe definitions with percentage syntax to avoid CSS parsing issues */
+@keyframes float {
   0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(16, 185, 129, 0.6);
+  }
+}
+
+@keyframes slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-down {
+  0% {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
   100% {
     opacity: 1;
   }
+}
+
+@keyframes bounce-subtle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
   50% {
-    opacity: 0.7;
+    transform: translateY(-10px);
   }
 }
 
-@layer utilities {
-  .animate-fade-in {
-    animation: fade-in 0.3s ease-out;
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
   }
-  .animate-slide-in-top {
-    animation: slide-in-from-top 0.3s ease-out;
+  50% {
+    background-position: 100% 50%;
   }
-  .animate-slide-in-bottom {
-    animation: slide-in-from-bottom 0.3s ease-out;
+  100% {
+    background-position: 0% 50%;
   }
-  .animate-slide-in-left {
-    animation: slide-in-from-left 0.3s ease-out;
-  }
-  .animate-slide-in-right {
-    animation: slide-in-from-right 0.3s ease-out;
-  }
-  .animate-scale-in {
-    animation: scale-in 0.2s ease-out;
-  }
-  .animate-pulse-soft {
-    animation: pulse-soft 2s ease-in-out infinite;
-  }
-}
-
-/* Page transitions */
-.page-enter {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
-.page-enter-active {
-  opacity: 1;
-  transform: translateY(0);
-  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
 }

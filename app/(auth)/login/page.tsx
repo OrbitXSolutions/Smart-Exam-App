@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { LanguageToggle } from "@/components/layout/language-toggle"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
-import { Eye, EyeOff, Shield, Lock, Mail } from "lucide-react"
+import { Eye, EyeOff, Shield, Lock, Mail, ArrowLeft } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -44,12 +44,12 @@ export default function LoginPage() {
     <div className="flex min-h-screen" dir={isRTL ? "rtl" : "ltr"}>
       {/* Left Side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-primary p-12 text-primary-foreground">
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-foreground/10">
             <Shield className="h-6 w-6" />
           </div>
-          <span className="text-2xl font-bold">ExamPro</span>
-        </div>
+          <span className="text-2xl font-bold">SmartExam</span>
+        </Link>
 
         <div className="space-y-6">
           <h1 className="text-4xl font-bold leading-tight text-balance">
@@ -74,20 +74,39 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="text-sm text-primary-foreground/60">© 2026 ExamPro. All rights reserved.</div>
+        <div className="text-sm text-primary-foreground/60">
+          © 2026 SmartExam. A product by{" "}
+          <a
+            href="https://www.build4it.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-primary-foreground"
+          >
+            Build4IT
+          </a>
+        </div>
       </div>
 
       {/* Right Side - Login Form */}
       <div className="flex w-full lg:w-1/2 flex-col">
         {/* Top Bar */}
         <div className="flex items-center justify-between p-4 md:p-6">
-          <div className="flex items-center gap-3 lg:hidden">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Shield className="h-5 w-5" />
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Back to Home</span>
+            </Link>
+            <div className="flex items-center gap-3 lg:hidden">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <Shield className="h-5 w-5" />
+              </div>
+              <span className="text-xl font-bold">SmartExam</span>
             </div>
-            <span className="text-xl font-bold">ExamPro</span>
           </div>
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-2">
             <LanguageToggle />
             <ThemeToggle />
           </div>
