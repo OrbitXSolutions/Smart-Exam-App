@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { useI18n } from "@/lib/i18n/context"
-import { getExams, deleteExam, publishExam, archiveExam } from "@/lib/api/exams"
 import type { Exam } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,10 +25,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { DataTable, type Column } from "@/components/ui/data-table"
-import { LoadingSpinner } from "@/components/ui/loading-spinner"
-import { EmptyState } from "@/components/ui/empty-state"
 import { StatusBadge } from "@/components/ui/status-badge"
+import { EmptyState } from "@/components/ui/empty-state"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { toast } from "sonner"
 import {
   Plus,
@@ -45,185 +43,151 @@ import {
   LayoutList,
 } from "lucide-react"
 
+const MOCK_EXAMS: Exam[] = [
+  {
+    id: 1,
+    titleEn: "Mathematics Final Exam",
+    titleAr: "الامتحان النهائي للرياضيات",
+    title: "Mathematics Final Exam",
+    code: "MATH-101",
+    status: "Published",
+    descriptionEn: "Final examination for Mathematics 101",
+    descriptionAr: "الامتحان النهائي لمادة الرياضيات 101",
+    durationMinutes: 120,
+    totalPoints: 100,
+    passingScore: 60,
+    passScore: 60,
+    isPublished: true,
+    isActive: true,
+    shuffleQuestions: true,
+    shuffleOptions: true,
+    showResults: true,
+    sectionsCount: 3,
+    sections: [],
+    createdAt: "2024-01-15T10:00:00Z",
+    updatedAt: "2024-01-20T14:30:00Z",
+  },
+  {
+    id: 2,
+    titleEn: "Physics Midterm",
+    titleAr: "امتحان الفيزياء النصفي",
+    title: "Physics Midterm",
+    code: "PHYS-201",
+    status: "Draft",
+    descriptionEn: "Midterm examination for Physics 201",
+    descriptionAr: "الامتحان النصفي لمادة الفيزياء 201",
+    durationMinutes: 90,
+    totalPoints: 80,
+    passingScore: 50,
+    passScore: 50,
+    isPublished: false,
+    isActive: true,
+    shuffleQuestions: true,
+    shuffleOptions: false,
+    showResults: false,
+    sectionsCount: 2,
+    sections: [],
+    createdAt: "2024-01-18T09:00:00Z",
+    updatedAt: "2024-01-18T09:00:00Z",
+  },
+  {
+    id: 3,
+    titleEn: "Chemistry Lab Assessment",
+    titleAr: "تقييم مختبر الكيمياء",
+    title: "Chemistry Lab Assessment",
+    code: "CHEM-301",
+    status: "Archived",
+    descriptionEn: "Lab assessment for Chemistry 301",
+    descriptionAr: "تقييم المختبر لمادة الكيمياء 301",
+    durationMinutes: 60,
+    totalPoints: 50,
+    passingScore: 30,
+    passScore: 30,
+    isPublished: true,
+    isActive: false,
+    shuffleQuestions: false,
+    shuffleOptions: true,
+    showResults: true,
+    sectionsCount: 1,
+    sections: [],
+    createdAt: "2024-01-10T08:00:00Z",
+    updatedAt: "2024-01-12T16:00:00Z",
+  },
+  {
+    id: 4,
+    titleEn: "English Literature Quiz",
+    titleAr: "اختبار الأدب الإنجليزي",
+    title: "English Literature Quiz",
+    code: "ENG-102",
+    status: "Published",
+    descriptionEn: "Weekly quiz for English Literature",
+    descriptionAr: "الاختبار الأسبوعي للأدب الإنجليزي",
+    durationMinutes: 30,
+    totalPoints: 25,
+    passingScore: 15,
+    passScore: 15,
+    isPublished: true,
+    isActive: true,
+    shuffleQuestions: true,
+    shuffleOptions: true,
+    showResults: true,
+    sectionsCount: 1,
+    sections: [],
+    createdAt: "2024-01-22T11:00:00Z",
+    updatedAt: "2024-01-22T11:00:00Z",
+  },
+]
+
+function getExamTitle(exam: Exam, language: string): string {
+  return exam.title || (language === "ar" ? exam.titleAr : exam.titleEn) || "Untitled Exam"
+}
+
+function getExamStatus(exam: Exam): string {
+  if (exam.status) return exam.status
+  if (!exam.isActive) return "Archived"
+  if (exam.isPublished) return "Published"
+  return "Draft"
+}
+
 export default function ExamsPage() {
-  const { t, dir } = useI18n()
-  const [exams, setExams] = useState<Exam[]>([])
-  const [loading, setLoading] = useState(true)
+  const { t, dir, language } = useI18n()
+  const [exams, setExams] = useState<Exam[]>(MOCK_EXAMS)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [examToDelete, setExamToDelete] = useState<Exam | null>(null)
 
-  useEffect(() => {
-    loadExams()
-  }, [])
-
-  async function loadExams() {
-    try {
-      setLoading(true)
-      const result = await getExams()
-      setExams(result.items)
-    } catch (error) {
-      toast.error("Failed to load exams")
-    } finally {
-      setLoading(false)
-    }
+  function handlePublish(exam: Exam) {
+    setExams(exams.map((e) => (e.id === exam.id ? { ...e, status: "Published", isPublished: true } : e)))
+    toast.success("Exam published successfully")
   }
 
-  async function handlePublish(exam: Exam) {
-    try {
-      await publishExam(exam.id)
-      toast.success("Exam published successfully")
-      loadExams()
-    } catch (error) {
-      toast.error("Failed to publish exam")
-    }
+  function handleArchive(exam: Exam) {
+    setExams(exams.map((e) => (e.id === exam.id ? { ...e, status: "Archived", isActive: false } : e)))
+    toast.success("Exam archived successfully")
   }
 
-  async function handleArchive(exam: Exam) {
-    try {
-      await archiveExam(exam.id)
-      toast.success("Exam archived successfully")
-      loadExams()
-    } catch (error) {
-      toast.error("Failed to archive exam")
-    }
-  }
-
-  async function handleDelete() {
+  function handleDelete() {
     if (!examToDelete) return
-    try {
-      await deleteExam(examToDelete.id)
-      toast.success("Exam deleted successfully")
-      setDeleteDialogOpen(false)
-      setExamToDelete(null)
-      loadExams()
-    } catch (error) {
-      toast.error("Failed to delete exam")
-    }
+    setExams(exams.filter((e) => e.id !== examToDelete.id))
+    toast.success("Exam deleted successfully")
+    setDeleteDialogOpen(false)
+    setExamToDelete(null)
   }
 
   const filteredExams = exams.filter((exam) => {
+    const title = getExamTitle(exam, language) || ""
+    const code = exam.code || ""
+    const status = getExamStatus(exam)
+
     const matchesSearch =
-      exam.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      exam.code?.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || exam.status === statusFilter
+      title.toLowerCase().includes(searchQuery.toLowerCase()) || code.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesStatus = statusFilter === "all" || status === statusFilter
     return matchesSearch && matchesStatus
   })
 
-  const columns: Column<Exam>[] = [
-    {
-      key: "title",
-      header: t("exams.title"),
-      render: (exam) => (
-        <div className="flex flex-col gap-1">
-          <Link href={`/exams/${exam.id}`} className="font-medium text-foreground hover:text-primary transition-colors">
-            {exam.title}
-          </Link>
-          {exam.code && <span className="text-xs text-muted-foreground">{exam.code}</span>}
-        </div>
-      ),
-    },
-    {
-      key: "status",
-      header: t("common.status"),
-      render: (exam) => <StatusBadge status={exam.status} />,
-    },
-    {
-      key: "duration",
-      header: t("exams.duration"),
-      render: (exam) => (
-        <div className="flex items-center gap-1.5 text-muted-foreground">
-          <Clock className="h-4 w-4" />
-          <span>{exam.durationMinutes} min</span>
-        </div>
-      ),
-    },
-    {
-      key: "passingScore",
-      header: t("exams.passingScore"),
-      render: (exam) => <span>{exam.passingScore}%</span>,
-    },
-    {
-      key: "sections",
-      header: t("exams.sections"),
-      render: (exam) => (
-        <div className="flex items-center gap-1.5 text-muted-foreground">
-          <LayoutList className="h-4 w-4" />
-          <span>{exam.sections?.length || 0}</span>
-        </div>
-      ),
-    },
-    {
-      key: "actions",
-      header: "",
-      className: "w-12",
-      render: (exam) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align={dir === "rtl" ? "start" : "end"}>
-            <DropdownMenuItem asChild>
-              <Link href={`/exams/${exam.id}`}>
-                <Eye className="h-4 w-4 me-2" />
-                {t("common.view")}
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/exams/${exam.id}/edit`}>
-                <Pencil className="h-4 w-4 me-2" />
-                {t("common.edit")}
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/exams/${exam.id}/builder`}>
-                <LayoutList className="h-4 w-4 me-2" />
-                {t("exams.builder")}
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {exam.status === "Draft" && (
-              <DropdownMenuItem onClick={() => handlePublish(exam)}>
-                <Send className="h-4 w-4 me-2" />
-                {t("exams.publish")}
-              </DropdownMenuItem>
-            )}
-            {exam.status === "Published" && (
-              <DropdownMenuItem onClick={() => handleArchive(exam)}>
-                <Archive className="h-4 w-4 me-2" />
-                {t("exams.archive")}
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={() => {
-                setExamToDelete(exam)
-                setDeleteDialogOpen(true)
-              }}
-            >
-              <Trash2 className="h-4 w-4 me-2" />
-              {t("common.delete")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ]
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <LoadingSpinner size="lg" />
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t("exams.title")}</h1>
@@ -278,7 +242,111 @@ export default function ExamsPage() {
               }
             />
           ) : (
-            <DataTable columns={columns} data={filteredExams} />
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t("exams.title")}</TableHead>
+                    <TableHead>{t("common.status")}</TableHead>
+                    <TableHead>{t("exams.duration")}</TableHead>
+                    <TableHead>{t("exams.passingScore")}</TableHead>
+                    <TableHead>{t("exams.sections")}</TableHead>
+                    <TableHead className="w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredExams.map((exam) => {
+                    const status = getExamStatus(exam)
+                    return (
+                      <TableRow key={exam.id}>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <Link
+                              href={`/exams/${exam.id}`}
+                              className="font-medium text-foreground hover:text-primary transition-colors"
+                            >
+                              {getExamTitle(exam, language)}
+                            </Link>
+                            {exam.code && <span className="text-xs text-muted-foreground">{exam.code}</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={status} />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <Clock className="h-4 w-4" />
+                            <span>{exam.durationMinutes || 0} min</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span>{exam.passingScore || exam.passScore || 0}%</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <LayoutList className="h-4 w-4" />
+                            <span>{exam.sections?.length || exam.sectionsCount || 0}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align={dir === "rtl" ? "start" : "end"}>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/exams/${exam.id}`}>
+                                  <Eye className="h-4 w-4 me-2" />
+                                  {t("common.view")}
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/exams/${exam.id}/edit`}>
+                                  <Pencil className="h-4 w-4 me-2" />
+                                  {t("common.edit")}
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/exams/${exam.id}/builder`}>
+                                  <LayoutList className="h-4 w-4 me-2" />
+                                  {t("exams.builder")}
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              {status === "Draft" && (
+                                <DropdownMenuItem onClick={() => handlePublish(exam)}>
+                                  <Send className="h-4 w-4 me-2" />
+                                  {t("exams.publish")}
+                                </DropdownMenuItem>
+                              )}
+                              {status === "Published" && (
+                                <DropdownMenuItem onClick={() => handleArchive(exam)}>
+                                  <Archive className="h-4 w-4 me-2" />
+                                  {t("exams.archive")}
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => {
+                                  setExamToDelete(exam)
+                                  setDeleteDialogOpen(true)
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 me-2" />
+                                {t("common.delete")}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -287,7 +355,9 @@ export default function ExamsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("common.confirmDelete")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("exams.deleteConfirm", { title: examToDelete?.title })}</AlertDialogDescription>
+            <AlertDialogDescription>
+              {t("exams.deleteConfirm", { title: examToDelete ? getExamTitle(examToDelete, language) : "" })}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>

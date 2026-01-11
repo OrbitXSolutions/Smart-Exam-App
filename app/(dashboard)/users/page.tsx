@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useI18n, getLocalizedField } from "@/lib/i18n/context"
-import { getUsers, deleteUser, resetUserPassword } from "@/lib/api/admin"
 import type { User } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,7 +28,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import {
   Plus,
   Search,
@@ -45,63 +43,83 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+const MOCK_USERS: User[] = [
+  {
+    id: "1",
+    email: "admin@smartexam.com",
+    fullNameEn: "John Administrator",
+    fullNameAr: "جون المسؤول",
+    role: "Admin",
+    isActive: true,
+    createdDate: "2024-01-01T00:00:00Z",
+  },
+  {
+    id: "2",
+    email: "sarah.instructor@smartexam.com",
+    fullNameEn: "Sarah Instructor",
+    fullNameAr: "سارة المدرسة",
+    role: "Instructor",
+    isActive: true,
+    createdDate: "2024-01-05T00:00:00Z",
+  },
+  {
+    id: "3",
+    email: "mike.candidate@smartexam.com",
+    fullNameEn: "Mike Candidate",
+    fullNameAr: "مايك المرشح",
+    role: "Candidate",
+    isActive: true,
+    createdDate: "2024-01-10T00:00:00Z",
+  },
+  {
+    id: "4",
+    email: "emma.proctor@smartexam.com",
+    fullNameEn: "Emma Proctor",
+    fullNameAr: "إيما المراقبة",
+    role: "ProctorReviewer",
+    isActive: true,
+    createdDate: "2024-01-15T00:00:00Z",
+  },
+  {
+    id: "5",
+    email: "james.auditor@smartexam.com",
+    fullNameEn: "James Auditor",
+    fullNameAr: "جيمس المدقق",
+    role: "Auditor",
+    isActive: false,
+    createdDate: "2024-01-20T00:00:00Z",
+  },
+]
+
 export default function UsersPage() {
-  const { t, language } = useI18n()
+  const { language } = useI18n()
   const router = useRouter()
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
+  const [users, setUsers] = useState<User[]>(MOCK_USERS)
   const [search, setSearch] = useState("")
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<User | null>(null)
 
-  useEffect(() => {
-    loadUsers()
-  }, [roleFilter, statusFilter])
-
-  async function loadUsers() {
-    setLoading(true)
-    try {
-      const params: any = {}
-      if (roleFilter !== "all") params.role = roleFilter
-      if (statusFilter !== "all") params.isActive = statusFilter === "active"
-      const data = await getUsers(params)
-      setUsers(data.items)
-    } catch {
-      toast.error("Failed to load users")
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const filteredUsers = users.filter((user) => {
-    if (!search) return true
     const name = getLocalizedField(user, "fullName", language).toLowerCase()
-    return name.includes(search.toLowerCase()) || user.email.toLowerCase().includes(search.toLowerCase())
+    const matchesSearch =
+      !search || name.includes(search.toLowerCase()) || user.email.toLowerCase().includes(search.toLowerCase())
+    const matchesRole = roleFilter === "all" || user.role === roleFilter
+    const matchesStatus = statusFilter === "all" || (statusFilter === "active" ? user.isActive : !user.isActive)
+    return matchesSearch && matchesRole && matchesStatus
   })
 
-  async function handleDeleteUser() {
+  function handleDeleteUser() {
     if (!userToDelete) return
-    try {
-      await deleteUser(userToDelete.id)
-      toast.success("User deleted successfully")
-      loadUsers()
-    } catch {
-      toast.error("Failed to delete user")
-    } finally {
-      setDeleteDialogOpen(false)
-      setUserToDelete(null)
-    }
+    setUsers(users.filter((u) => u.id !== userToDelete.id))
+    toast.success("User deleted successfully")
+    setDeleteDialogOpen(false)
+    setUserToDelete(null)
   }
 
-  async function handleResetPassword(user: User) {
-    try {
-      const result = await resetUserPassword(user.id)
-      toast.success(`Password reset. Temporary password: ${result.temporaryPassword}`)
-    } catch {
-      toast.error("Failed to reset password")
-    }
+  function handleResetPassword(user: User) {
+    toast.success(`Password reset. Temporary password: TempPass123!`)
   }
 
   const getRoleBadgeVariant = (role: string) => {
@@ -128,7 +146,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -231,100 +249,86 @@ export default function UsersPage() {
             </Select>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <LoadingSpinner size="lg" />
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{language === "ar" ? "المستخدم" : "User"}</TableHead>
+                  <TableHead>{language === "ar" ? "البريد الإلكتروني" : "Email"}</TableHead>
+                  <TableHead>{language === "ar" ? "الدور" : "Role"}</TableHead>
+                  <TableHead>{language === "ar" ? "الحالة" : "Status"}</TableHead>
+                  <TableHead>{language === "ar" ? "تاريخ الإنشاء" : "Created"}</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableHead>{language === "ar" ? "المستخدم" : "User"}</TableHead>
-                    <TableHead>{language === "ar" ? "البريد الإلكتروني" : "Email"}</TableHead>
-                    <TableHead>{language === "ar" ? "الدور" : "Role"}</TableHead>
-                    <TableHead>{language === "ar" ? "الحالة" : "Status"}</TableHead>
-                    <TableHead>{language === "ar" ? "تاريخ الإنشاء" : "Created"}</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      {language === "ar" ? "لا يوجد مستخدمون" : "No users found"}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        {language === "ar" ? "لا يوجد مستخدمون" : "No users found"}
+                ) : (
+                  filteredUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-medium">
+                            {getLocalizedField(user, "fullName", language).charAt(0).toUpperCase()}
+                          </div>
+                          <span className="font-medium">{getLocalizedField(user, "fullName", language)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                      <TableCell>
+                        <Badge variant={getRoleBadgeVariant(user.role)}>{user.role}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={user.isActive ? "Active" : "Inactive"} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(user.createdDate).toLocaleDateString(language === "ar" ? "ar-SA" : "en-US")}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => router.push(`/users/${user.id}`)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              {language === "ar" ? "عرض" : "View"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/users/${user.id}/edit`)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              {language === "ar" ? "تعديل" : "Edit"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleResetPassword(user)}>
+                              <KeyRound className="mr-2 h-4 w-4" />
+                              {language === "ar" ? "إعادة تعيين كلمة المرور" : "Reset Password"}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => {
+                                setUserToDelete(user)
+                                setDeleteDialogOpen(true)
+                              }}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              {language === "ar" ? "حذف" : "Delete"}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    filteredUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-medium">
-                              {getLocalizedField(user, "fullName", language).charAt(0).toUpperCase()}
-                            </div>
-                            <span className="font-medium">{getLocalizedField(user, "fullName", language)}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                        <TableCell>
-                          <Badge variant={getRoleBadgeVariant(user.role)}>{user.role}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={user.isActive ? "success" : "muted"}>
-                            {user.isActive
-                              ? language === "ar"
-                                ? "نشط"
-                                : "Active"
-                              : language === "ar"
-                                ? "غير نشط"
-                                : "Inactive"}
-                          </StatusBadge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(user.createdDate).toLocaleDateString(language === "ar" ? "ar-SA" : "en-US")}
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => router.push(`/users/${user.id}`)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                {language === "ar" ? "عرض" : "View"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => router.push(`/users/${user.id}/edit`)}>
-                                <Pencil className="mr-2 h-4 w-4" />
-                                {language === "ar" ? "تعديل" : "Edit"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleResetPassword(user)}>
-                                <KeyRound className="mr-2 h-4 w-4" />
-                                {language === "ar" ? "إعادة تعيين كلمة المرور" : "Reset Password"}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => {
-                                  setUserToDelete(user)
-                                  setDeleteDialogOpen(true)
-                                }}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                {language === "ar" ? "حذف" : "Delete"}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
