@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-const BACKEND_URL = "http://zoolker-003-site8.jtempurl.com/api"
+const BACKEND_URL = "https://zoolker-003-site8.jtempurl.com/api"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params

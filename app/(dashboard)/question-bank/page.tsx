@@ -79,12 +79,8 @@ export default function QuestionBankPage() {
       ])
 
       // Handle questions response
-      if (questionsRes.success && questionsRes.data) {
-        const items = questionsRes.data.items || questionsRes.data
-        setQuestions(Array.isArray(items) ? items : [])
-      } else {
-        setQuestions([])
-      }
+      const items = questionsRes?.items || []
+      setQuestions(Array.isArray(items) ? items : [])
 
       // Handle categories response
       const categoriesData = categoriesRes?.items || []
@@ -111,11 +107,11 @@ export default function QuestionBankPage() {
     setIsDeleting(true)
     try {
       const result = await deleteQuestion(questionToDelete.id)
-      if (result.success) {
+      if (result) {
         setQuestions(questions.filter((q) => q.id !== questionToDelete.id))
         toast.success("Question deleted successfully")
       } else {
-        toast.error(result.message || "Failed to delete question")
+        toast.error("Failed to delete question")
       }
     } catch (err) {
       toast.error("Failed to delete question")
@@ -129,11 +125,11 @@ export default function QuestionBankPage() {
   const handleToggleStatus = async (question: Question) => {
     try {
       const result = await toggleQuestionStatus(question.id)
-      if (result.success) {
+      if (result) {
         setQuestions(questions.map((q) => (q.id === question.id ? { ...q, isActive: !q.isActive } : q)))
         toast.success(`Question ${question.isActive ? "deactivated" : "activated"} successfully`)
       } else {
-        toast.error(result.message || "Failed to update question status")
+        toast.error("Failed to update question status")
       }
     } catch (err) {
       toast.error("Failed to update question status")

@@ -19,31 +19,28 @@ interface PaginatedResponse<T> {
 
 class ApiClient {
   private baseUrl: string
-  private token: string | null = null
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl.replace(/\/+$/, "")
+  }
+
+  private getToken(): string | null {
     if (typeof window !== "undefined") {
-      this.token = localStorage.getItem("auth_token")
+      return localStorage.getItem("auth_token")
     }
+    return null
   }
 
   setToken(token: string) {
-    this.token = token
     if (typeof window !== "undefined") {
       localStorage.setItem("auth_token", token)
     }
   }
 
   clearToken() {
-    this.token = null
     if (typeof window !== "undefined") {
       localStorage.removeItem("auth_token")
     }
-  }
-
-  getToken() {
-    return this.token
   }
 
   private normalizeEndpoint(endpoint: string): string {
@@ -54,15 +51,18 @@ class ApiClient {
     const normalizedEndpoint = this.normalizeEndpoint(endpoint)
     const url = `${this.baseUrl}${normalizedEndpoint}`
 
+    const token = this.getToken()
+
     const headers: HeadersInit = {
       "Content-Type": "application/json",
-      ...(this.token && { Authorization: `Bearer ${this.token}` }),
+      ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     }
 
     console.log(
       `[API Request] ${options.method || "GET"} ${url}`,
       options.body ? JSON.parse(options.body as string) : "",
+      token ? "(with auth token)" : "(no auth token)",
     )
 
     try {
@@ -92,6 +92,7 @@ class ApiClient {
         throw new Error(errorMessage)
       }
 
+      // Handle wrapped response { success, data, message }
       if (jsonResponse.success !== undefined) {
         if (!jsonResponse.success) {
           throw new Error(jsonResponse.message || "Operation failed")
@@ -99,16 +100,16 @@ class ApiClient {
         return jsonResponse.data !== undefined ? jsonResponse.data : jsonResponse
       }
 
+      // Return raw response
       return jsonResponse.data !== undefined ? jsonResponse.data : jsonResponse
     } catch (error) {
       console.error(`[API Error] ${options.method || "GET"} ${url}`, error)
 
-      if (mockData !== undefined) {
-        console.warn(`[API Fallback] Using mock data for ${endpoint}`)
+      if (mockData !== undefined && error instanceof TypeError && (error as Error).message === "Failed to fetch") {
+        console.warn(`[API Fallback] Network error - Using mock data for ${endpoint}`)
         return mockData
       }
 
-      const message = error instanceof Error ? error.message : "An error occurred"
       throw error
     }
   }
@@ -163,13 +164,15 @@ class ApiClient {
       ? `${this.baseUrl}${normalizedEndpoint}?folder=${folder}`
       : `${this.baseUrl}${normalizedEndpoint}`
 
+    const token = this.getToken()
+
     console.log(`[API Upload] POST ${url}`, { fileName: file.name, size: file.size, type: file.type })
 
     try {
       const response = await fetch(url, {
         method: "POST",
         headers: {
-          ...(this.token && { Authorization: `Bearer ${this.token}` }),
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
         body: formData,
       })

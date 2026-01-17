@@ -135,6 +135,22 @@ export enum VerificationStatus {
   Rejected = "Rejected",
 }
 
+export enum ExamType {
+  Flex = 0, // Candidate can start anytime within availability window
+  Fixed = 1, // All candidates must start at exact StartAt time
+}
+
+// ============ COMMON TYPES ============
+export interface PagedResult<T> {
+  items: T[]
+  totalCount: number
+  pageNumber: number
+  pageSize: number
+  totalPages: number
+  hasPreviousPage?: boolean
+  hasNextPage?: boolean
+}
+
 // ============ AUTH ============
 export interface User {
   id: string
@@ -237,6 +253,7 @@ export interface ExamQuestion {
   id: number
   examId: number
   examSectionId: number
+  examTopicId: number | null // Added examTopicId for topic support
   questionId: number
   order: number
   points: number
@@ -248,28 +265,48 @@ export interface ExamQuestion {
   originalPoints: number
 }
 
-export interface ExamSection {
+export interface ExamTopic {
   id: number
-  examId: number
+  examSectionId: number
   titleEn: string
   titleAr: string
-  descriptionEn?: string
-  descriptionAr?: string
+  descriptionEn: string | null
+  descriptionAr: string | null
   order: number
-  durationMinutes: number | null
-  totalPointsOverride: number | null
   createdDate: string
   questionsCount: number
   totalPoints: number
   questions: ExamQuestion[]
 }
 
-export interface Exam {
+export interface ExamSection {
   id: number
+  examId: number
   titleEn: string
   titleAr: string
-  descriptionEn?: string
-  descriptionAr?: string
+  descriptionEn: string | null
+  descriptionAr: string | null
+  order: number
+  durationMinutes: number | null
+  totalPointsOverride: number | null
+  createdDate: string
+  topicsCount: number // Added topicsCount
+  questionsCount: number
+  totalPoints: number
+  topics: ExamTopic[] // Added topics array
+  questions: ExamQuestion[]
+}
+
+export interface Exam {
+  id: number
+  departmentId: number // Added departmentId
+  departmentNameEn?: string // Added department name
+  departmentNameAr?: string
+  examType: ExamType // Added examType
+  titleEn: string
+  titleAr: string
+  descriptionEn: string | null
+  descriptionAr: string | null
   startAt: string | null
   endAt: string | null
   durationMinutes: number
@@ -284,9 +321,9 @@ export interface Exam {
   sectionsCount: number
   questionsCount: number
   totalPoints: number
-  sections?: ExamSection[]
-  instructions?: ExamInstruction[]
-  accessPolicy?: ExamAccessPolicy
+  sections: ExamSection[]
+  instructions: ExamInstruction[]
+  accessPolicy: ExamAccessPolicy | null
 }
 
 // ============ ATTEMPT ============

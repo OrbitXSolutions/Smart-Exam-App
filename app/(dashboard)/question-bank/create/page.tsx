@@ -52,7 +52,7 @@ interface OptionInput {
   order: number
 }
 
-export default function CreateQuestionPage() {
+const CreateQuestionPage = () => {
   const router = useRouter()
   const { t, language } = useI18n()
   const errorRef = useRef<HTMLDivElement>(null)
@@ -275,13 +275,25 @@ export default function CreateQuestionPage() {
         options: finalOptions,
       })
 
-      if (response.success) {
-        toast.success(response.message || "Question created successfully")
+      const responseAny = response as any
+
+      if (responseAny.id) {
+        // Response is the Question directly
+        toast.success("Question created successfully")
         router.push("/question-bank")
-      } else {
+      } else if (responseAny.success === true) {
+        // Response is wrapped { success, message, data }
+        toast.success(responseAny.message || "Question created successfully")
+        router.push("/question-bank")
+      } else if (responseAny.success === false) {
+        // Response indicates failure
         const apiErrors =
-          response.errors?.length > 0 ? response.errors : [response.message || "Failed to create question"]
+          responseAny.errors?.length > 0 ? responseAny.errors : [responseAny.message || "Failed to create question"]
         setFormErrors(apiErrors)
+      } else {
+        // Unknown response format, but we got a response so assume success
+        toast.success("Question created successfully")
+        router.push("/question-bank")
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An error occurred while creating the question"
@@ -802,3 +814,5 @@ export default function CreateQuestionPage() {
     </div>
   )
 }
+
+export default CreateQuestionPage

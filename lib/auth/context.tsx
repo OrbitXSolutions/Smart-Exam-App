@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Check for existing session
-    const token = apiClient.getToken()
+    const token = localStorage.getItem("auth_token")
     const savedUser = localStorage.getItem("user")
 
     if (token && savedUser) {
@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true)
 
     try {
-      const response = await fetch("http://zoolker-003-site8.jtempurl.com/api/Auth/login", {
+      const response = await fetch("/api/proxy/Auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -104,6 +104,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
 
       const result: LoginApiResponse = await response.json()
+
+      console.log("[Auth] Login response:", result)
 
       if (result.success && result.data) {
         const mappedUser: User = {
@@ -120,6 +122,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(mappedUser)
         localStorage.setItem("user", JSON.stringify(mappedUser))
         localStorage.setItem("refreshToken", result.data.refreshToken)
+
+        console.log("[Auth] Login successful, token stored")
         toast.success("Login successful")
         setIsLoading(false)
         return true
@@ -129,20 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const errorMsg = result.errors?.join(", ") || result.message || "Login failed"
       throw new Error(errorMsg)
     } catch (error) {
-      console.warn("[Auth] Backend login failed, trying mock login:", error)
-
-      const mockUser = mockUsers[email]
-      if (mockUser && password === MOCK_PASSWORD) {
-        const mockToken = `mock-token-${Date.now()}`
-        apiClient.setToken(mockToken)
-        setUser(mockUser)
-        localStorage.setItem("user", JSON.stringify(mockUser))
-        toast.success("Login successful (demo mode)")
-        setIsLoading(false)
-        return true
-      }
-
-      toast.error("Invalid credentials")
+      console.error("[Auth] Login error:", error)
+      toast.error(error instanceof Error ? error.message : "Login failed")
       setIsLoading(false)
       return false
     }

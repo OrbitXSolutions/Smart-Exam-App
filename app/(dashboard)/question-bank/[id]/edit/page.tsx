@@ -1,9 +1,8 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect, use } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import { useI18n } from "@/lib/i18n/context"
 import { Header } from "@/components/layout/header"
@@ -31,8 +30,9 @@ interface OptionInput {
   originalId?: number
 }
 
-export default function EditQuestionPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params)
+export default function EditQuestionPage() {
+  const params = useParams()
+  const questionId = params.id as string
   const router = useRouter()
   const { t, language } = useI18n()
 
@@ -41,6 +41,8 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
   const [types, setTypes] = useState<QuestionType[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+
+  const isValidId = questionId && !isNaN(Number(questionId)) && Number(questionId) > 0
 
   const [formData, setFormData] = useState({
     body: "",
@@ -54,47 +56,64 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
   const [options, setOptions] = useState<OptionInput[]>([])
 
   useEffect(() => {
+    if (questionId === "create" || !isValidId) {
+      return
+    }
     fetchData()
-  }, [resolvedParams.id])
+  }, [questionId])
 
   const fetchData = async () => {
     try {
       const [questionRes, categoriesRes, typesRes] = await Promise.all([
-        getQuestionById(Number(resolvedParams.id)),
+        getQuestionById(Number(questionId)),
         getQuestionCategories(),
         getQuestionTypes(),
       ])
 
-      if (questionRes.success && questionRes.data) {
-        const q = questionRes.data
+      console.log("[v0] Edit page - questionRes:", questionRes)
+      const q = (questionRes as any)?.data || questionRes
+      if (q && q.id) {
         setQuestion(q)
         setFormData({
-          body: q.body,
-          questionTypeId: String(q.questionTypeId),
-          questionCategoryId: String(q.questionCategoryId),
-          points: q.points,
-          difficultyLevel: q.difficultyLevel,
-          isActive: q.isActive,
+          body: q.body || "",
+          questionTypeId: String(q.questionTypeId || ""),
+          questionCategoryId: String(q.questionCategoryId || ""),
+          points: q.points || 1,
+          difficultyLevel: q.difficultyLevel || DifficultyLevel.Easy,
+          isActive: q.isActive !== false,
         })
-        setOptions(
-          q.options.map((opt) => ({
-            id: String(opt.id),
-            text: opt.text,
-            isCorrect: opt.isCorrect,
-            order: opt.order,
-            originalId: opt.id,
-          })),
-        )
+        if (q.options) {
+          setOptions(
+            q.options.map((opt: any) => ({
+              id: String(opt.id),
+              text: opt.text,
+              isCorrect: opt.isCorrect,
+              order: opt.order,
+              originalId: opt.id,
+            })),
+          )
+        }
       }
 
-      if (categoriesRes?.items) {
-        setCategories(categoriesRes.items)
+      console.log("[v0] Edit page - categoriesRes:", categoriesRes)
+      console.log("[v0] Edit page - typesRes:", typesRes)
+      const cats = (categoriesRes as any)?.items || categoriesRes
+      const typesList = (typesRes as any)?.items || typesRes
+
+      if (Array.isArray(cats)) {
+        setCategories(cats)
+      } else if (cats?.items) {
+        setCategories(cats.items)
       }
-      if (typesRes?.items) {
-        setTypes(typesRes.items)
+
+      if (Array.isArray(typesList)) {
+        setTypes(typesList)
+      } else if (typesList?.items) {
+        setTypes(typesList.items)
       }
     } catch (error) {
-      console.error("Failed to fetch data:", error)
+      console.error("[v0] Failed to fetch data:", error)
+      toast.error("Failed to load question data")
     }
     setIsLoading(false)
   }
@@ -144,21 +163,31 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
 
     setIsSaving(true)
 
-    const response = await updateQuestion(Number(resolvedParams.id), {
-      body: formData.body,
-      questionTypeId: Number(formData.questionTypeId),
-      questionCategoryId: Number(formData.questionCategoryId),
-      points: formData.points,
-      difficultyLevel: formData.difficultyLevel,
-      isActive: formData.isActive,
-    })
+    try {
+      const response = await updateQuestion(Number(questionId), {
+        body: formData.body,
+        questionTypeId: Number(formData.questionTypeId),
+        questionCategoryId: Number(formData.questionCategoryId),
+        points: formData.points,
+        difficultyLevel: formData.difficultyLevel,
+        isActive: formData.isActive,
+      })
+
+      console.log("[v0] Update response:", response)
+      const isSuccess = response && (response as any).success !== false
+
+      if (isSuccess) {
+        toast.success("Question updated successfully")
+        router.push(`/question-bank/${questionId}`)
+      } else {
+        toast.error((response as any)?.message || "Failed to update question")
+      }
+    } catch (error) {
+      console.error("[v0] Update error:", error)
+      toast.error("Failed to update question")
+    }
 
     setIsSaving(false)
-
-    if (response.success) {
-      toast.success("Question updated successfully")
-      router.push(`/question-bank/${resolvedParams.id}`)
-    }
   }
 
   if (isLoading) {
@@ -176,6 +205,12 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
         <Header title="Question Not Found" />
         <div className="flex-1 p-6">
           <p className="text-muted-foreground">The question you are looking for does not exist.</p>
+          <Button variant="outline" asChild className="mt-4 bg-transparent">
+            <Link href="/question-bank">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Question Bank
+            </Link>
+          </Button>
         </div>
       </div>
     )
@@ -225,7 +260,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
                       value={formData.questionTypeId}
                       onValueChange={(value) => setFormData({ ...formData, questionTypeId: value })}
                     >
-                      <SelectTrigger id="type">
+                      <SelectTrigger id="type" className="w-full">
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -246,7 +281,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
                       value={formData.questionCategoryId}
                       onValueChange={(value) => setFormData({ ...formData, questionCategoryId: value })}
                     >
-                      <SelectTrigger id="category">
+                      <SelectTrigger id="category" className="w-full">
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
@@ -267,7 +302,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
                       value={String(formData.difficultyLevel)}
                       onValueChange={(value) => setFormData({ ...formData, difficultyLevel: Number(value) })}
                     >
-                      <SelectTrigger id="difficulty">
+                      <SelectTrigger id="difficulty" className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -287,6 +322,7 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
                       step={0.5}
                       value={formData.points}
                       onChange={(e) => setFormData({ ...formData, points: Number(e.target.value) })}
+                      className="w-full"
                     />
                   </div>
                 </div>
@@ -354,10 +390,6 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
                     <Plus className="mr-2 h-4 w-4" />
                     {t("questionBank.addOption")}
                   </Button>
-
-                  <p className="text-xs text-muted-foreground text-center">
-                    Note: Option changes require backend integration (backend-dependent)
-                  </p>
                 </CardContent>
               </Card>
             )}

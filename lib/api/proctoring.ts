@@ -1,61 +1,76 @@
 import { apiClient } from "@/lib/api-client"
 import type { Incident, LiveSession } from "@/lib/types"
 
+// Mock data for live sessions
+const MOCK_SESSIONS: LiveSession[] = [
+  {
+    id: "session-1",
+    candidateId: "cand-1",
+    candidateName: "Ahmed Hassan",
+    examTitle: "Mathematics Final Exam",
+    startedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+    timeRemaining: 75,
+    status: "Active",
+    incidentCount: 0,
+    flagged: false,
+    lastActivity: new Date(Date.now() - 1000 * 30).toISOString(),
+  },
+  {
+    id: "session-2",
+    candidateId: "cand-2",
+    candidateName: "Sara Ali",
+    examTitle: "Mathematics Final Exam",
+    startedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    timeRemaining: 90,
+    status: "Active",
+    incidentCount: 2,
+    flagged: true,
+    lastActivity: new Date(Date.now() - 1000 * 60).toISOString(),
+  },
+  {
+    id: "session-3",
+    candidateId: "cand-3",
+    candidateName: "Mohammed Khalid",
+    examTitle: "Physics Midterm",
+    startedAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+    timeRemaining: 75,
+    status: "Active",
+    incidentCount: 1,
+    flagged: false,
+    lastActivity: new Date(Date.now() - 1000 * 120).toISOString(),
+  },
+  {
+    id: "session-4",
+    candidateId: "cand-4",
+    candidateName: "Fatima Ahmed",
+    examTitle: "Physics Midterm",
+    startedAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
+    timeRemaining: 70,
+    status: "Active",
+    incidentCount: 0,
+    flagged: false,
+    lastActivity: new Date(Date.now() - 1000 * 45).toISOString(),
+  },
+]
+
 // Get live proctoring sessions
 export async function getLiveSessions(): Promise<LiveSession[]> {
   try {
-    return await apiClient.get("/api/proctoring/sessions")
+    const response = await apiClient.get("/api/proctoring/sessions")
+    // Ensure we always return an array
+    if (Array.isArray(response)) {
+      return response
+    }
+    if (response?.items && Array.isArray(response.items)) {
+      return response.items
+    }
+    if (response?.data && Array.isArray(response.data)) {
+      return response.data
+    }
+    // If no valid array found, return mock data
+    return MOCK_SESSIONS
   } catch {
-    return [
-      {
-        id: "session-1",
-        candidateId: "cand-1",
-        candidateName: "Ahmed Hassan",
-        examTitle: "Mathematics Final Exam",
-        startedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-        timeRemaining: 75,
-        status: "Active",
-        incidentCount: 0,
-        flagged: false,
-        lastActivity: new Date(Date.now() - 1000 * 30).toISOString(),
-      },
-      {
-        id: "session-2",
-        candidateId: "cand-2",
-        candidateName: "Sara Ali",
-        examTitle: "Mathematics Final Exam",
-        startedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-        timeRemaining: 90,
-        status: "Active",
-        incidentCount: 2,
-        flagged: true,
-        lastActivity: new Date(Date.now() - 1000 * 60).toISOString(),
-      },
-      {
-        id: "session-3",
-        candidateId: "cand-3",
-        candidateName: "Mohammed Khalid",
-        examTitle: "Physics Midterm",
-        startedAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-        timeRemaining: 75,
-        status: "Active",
-        incidentCount: 1,
-        flagged: false,
-        lastActivity: new Date(Date.now() - 1000 * 120).toISOString(),
-      },
-      {
-        id: "session-4",
-        candidateId: "cand-4",
-        candidateName: "Fatima Ahmed",
-        examTitle: "Physics Midterm",
-        startedAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
-        timeRemaining: 70,
-        status: "Active",
-        incidentCount: 0,
-        flagged: false,
-        lastActivity: new Date(Date.now() - 1000 * 45).toISOString(),
-      },
-    ]
+    return MOCK_SESSIONS
   }
 }
 

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useI18n } from "@/lib/i18n/context"
 import { Header } from "@/components/layout/header"
@@ -9,27 +10,69 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { PageLoader } from "@/components/ui/loading-spinner"
-import { getQuestionById } from "@/lib/api/question-bank"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { getQuestionById, deleteQuestion } from "@/lib/api/question-bank"
 import type { Question } from "@/lib/types"
-import { ArrowLeft, Edit, Check, X, FileImage, Calendar, Clock } from "lucide-react"
+import { ArrowLeft, Edit, Check, X, FileImage, Calendar, Clock, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 
-export default function QuestionDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params)
+export default function QuestionDetailPage() {
+  const params = useParams()
+  const questionId = params.id as string
+  const router = useRouter()
   const { t, language } = useI18n()
 
   const [question, setQuestion] = useState<Question | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const numericId = Number(questionId)
+  const isValidId = !isNaN(numericId) && numericId > 0
 
   useEffect(() => {
+    if (questionId === "create" || !isValidId) {
+      return
+    }
     fetchQuestion()
-  }, [resolvedParams.id])
+  }, [questionId])
 
   const fetchQuestion = async () => {
-    const response = await getQuestionById(Number(resolvedParams.id))
-    if (response.success && response.data) {
-      setQuestion(response.data)
+    try {
+      const response = await getQuestionById(numericId)
+      console.log("[v0] Detail page - response:", response)
+
+      const q = (response as any)?.data || response
+      if (q && q.id) {
+        setQuestion(q)
+      }
+    } catch (error) {
+      console.error("[v0] Failed to fetch question:", error)
+      toast.error("Failed to load question")
     }
     setIsLoading(false)
+  }
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    try {
+      await deleteQuestion(numericId)
+      toast.success("Question deleted successfully")
+      router.push("/question-bank")
+    } catch (error) {
+      console.error("[v0] Failed to delete question:", error)
+      toast.error("Failed to delete question")
+    }
+    setIsDeleting(false)
   }
 
   if (isLoading) {
@@ -47,6 +90,12 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
         <Header title="Question Not Found" />
         <div className="flex-1 p-6">
           <p className="text-muted-foreground">The question you are looking for does not exist.</p>
+          <Button variant="outline" className="mt-4 bg-transparent" asChild>
+            <Link href="/question-bank">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Question Bank
+            </Link>
+          </Button>
         </div>
       </div>
     )
@@ -65,12 +114,43 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
                 {t("common.back")}
               </Link>
             </Button>
-            <Button asChild>
-              <Link href={`/question-bank/${question.id}/edit`}>
-                <Edit className="mr-2 h-4 w-4" />
-                {t("common.edit")}
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="text-destructive hover:bg-destructive hover:text-destructive-foreground bg-transparent"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {t("common.delete")}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Question</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete this question? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? "Deleting..." : t("common.delete")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <Button asChild>
+                <Link href={`/question-bank/${question.id}/edit`}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  {t("common.edit")}
+                </Link>
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-6">
