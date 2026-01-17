@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { apiClient } from "@/lib/api-client"
-import type { User, UserRole, AuthResponse } from "@/lib/types"
+import type { User, UserRole } from "@/lib/types"
 import { toast } from "sonner"
 
 interface AuthContextType {
@@ -16,35 +16,58 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Mock user for development (backend-dependent)
 const mockUsers: Record<string, User> = {
-  "admin@exam.com": {
+  "ahmed.it.admin@examcore.com": {
     id: "1",
-    email: "admin@exam.com",
-    fullNameEn: "Admin User",
-    fullNameAr: "مستخدم مسؤول",
+    email: "ahmed.it.admin@examcore.com",
+    fullNameEn: "Ahmed Hassan",
+    fullNameAr: "أحمد حسن",
     role: "Admin" as UserRole,
     isActive: true,
     createdDate: new Date().toISOString(),
   },
-  "instructor@exam.com": {
+  "sara.it.instructor@examcore.com": {
     id: "2",
-    email: "instructor@exam.com",
-    fullNameEn: "Instructor User",
-    fullNameAr: "مستخدم معلم",
+    email: "sara.it.instructor@examcore.com",
+    fullNameEn: "Sara Ali",
+    fullNameAr: "سارة علي",
     role: "Instructor" as UserRole,
     isActive: true,
     createdDate: new Date().toISOString(),
   },
-  "candidate@exam.com": {
+  "ali.it.candidate@examcore.com": {
     id: "3",
-    email: "candidate@exam.com",
-    fullNameEn: "Candidate User",
-    fullNameAr: "مستخدم مرشح",
+    email: "ali.it.candidate@examcore.com",
+    fullNameEn: "Ali Mohammed",
+    fullNameAr: "علي محمد",
     role: "Candidate" as UserRole,
     isActive: true,
     createdDate: new Date().toISOString(),
   },
+}
+
+const MOCK_PASSWORD = "Demo@123456"
+
+interface LoginApiResponse {
+  success: boolean
+  message: string
+  data: {
+    accessToken: string
+    refreshToken: string
+    expiration: string
+    user: {
+      id: string
+      email: string
+      displayName: string
+      fullName: string
+      isBlocked: boolean
+      status: string
+      emailConfirmed: boolean
+      roles: string[]
+      createdDate: string
+    }
+  }
+  errors: string[]
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -72,29 +95,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true)
 
     try {
-      // Try real API first
-      const response = await apiClient.post<AuthResponse>("/api/Auth/login", { email, password })
+      const response = await fetch("http://zoolker-003-site8.jtempurl.com/api/Auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      })
 
-      if (response.success && response.data) {
-        apiClient.setToken(response.data.token)
-        setUser(response.data.user)
-        localStorage.setItem("user", JSON.stringify(response.data.user))
+      const result: LoginApiResponse = await response.json()
+
+      if (result.success && result.data) {
+        const mappedUser: User = {
+          id: result.data.user.id,
+          email: result.data.user.email,
+          fullNameEn: result.data.user.fullName || result.data.user.displayName,
+          fullNameAr: result.data.user.fullName || result.data.user.displayName,
+          role: (result.data.user.roles[0] || "Candidate") as UserRole,
+          isActive: !result.data.user.isBlocked,
+          createdDate: result.data.user.createdDate,
+        }
+
+        apiClient.setToken(result.data.accessToken)
+        setUser(mappedUser)
+        localStorage.setItem("user", JSON.stringify(mappedUser))
+        localStorage.setItem("refreshToken", result.data.refreshToken)
         toast.success("Login successful")
+        setIsLoading(false)
         return true
       }
 
-      throw new Error(response.message || "Login failed")
-    } catch {
-      // Fallback to mock data for development (backend-dependent)
-      console.warn("[Auth] Using mock login - backend-dependent")
+      // API returned error
+      const errorMsg = result.errors?.join(", ") || result.message || "Login failed"
+      throw new Error(errorMsg)
+    } catch (error) {
+      console.warn("[Auth] Backend login failed, trying mock login:", error)
 
       const mockUser = mockUsers[email]
-      if (mockUser && password === "password123") {
+      if (mockUser && password === MOCK_PASSWORD) {
         const mockToken = `mock-token-${Date.now()}`
         apiClient.setToken(mockToken)
         setUser(mockUser)
         localStorage.setItem("user", JSON.stringify(mockUser))
-        toast.success("Login successful (mock mode)")
+        toast.success("Login successful (demo mode)")
         setIsLoading(false)
         return true
       }
@@ -108,6 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     apiClient.clearToken()
     localStorage.removeItem("user")
+    localStorage.removeItem("refreshToken")
     setUser(null)
     toast.success("Logged out successfully")
   }

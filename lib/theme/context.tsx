@@ -23,7 +23,7 @@ const accentColors: Record<AccentColor, { primary: string; primaryForeground: st
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark")
+  const [theme, setThemeState] = useState<Theme>("light")
   const [accentColor, setAccentColorState] = useState<AccentColor>("emerald")
   const [mounted, setMounted] = useState(false)
 

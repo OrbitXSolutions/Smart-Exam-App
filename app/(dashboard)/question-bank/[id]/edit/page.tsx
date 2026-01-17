@@ -16,8 +16,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { LoadingSpinner, PageLoader } from "@/components/ui/loading-spinner"
-import { getQuestionById, updateQuestion, getQuestionCategories, getQuestionTypes } from "@/lib/api/question-bank"
-import type { Question, QuestionCategory, QuestionType } from "@/lib/types"
+import { getQuestionById, updateQuestion } from "@/lib/api/question-bank"
+import { getQuestionCategories, getQuestionTypes, type QuestionCategory, type QuestionType } from "@/lib/api/lookups"
+import type { Question } from "@/lib/types"
 import { DifficultyLevel } from "@/lib/types"
 import { toast } from "sonner"
 import { ArrowLeft, Plus, Trash2, GripVertical } from "lucide-react"
@@ -86,11 +87,11 @@ export default function EditQuestionPage({ params }: { params: Promise<{ id: str
         )
       }
 
-      if (categoriesRes.success && categoriesRes.data) {
-        setCategories(categoriesRes.data.items)
+      if (categoriesRes?.items) {
+        setCategories(categoriesRes.items)
       }
-      if (typesRes.success && typesRes.data) {
-        setTypes(typesRes.data.items)
+      if (typesRes?.items) {
+        setTypes(typesRes.items)
       }
     } catch (error) {
       console.error("Failed to fetch data:", error)

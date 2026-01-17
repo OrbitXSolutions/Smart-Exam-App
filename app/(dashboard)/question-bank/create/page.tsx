@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useI18n } from "@/lib/i18n/context"
 import { Header } from "@/components/layout/header"
@@ -15,12 +15,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
-import { createQuestion, getQuestionCategories, getQuestionTypes } from "@/lib/api/question-bank"
-import type { QuestionCategory, QuestionType } from "@/lib/types"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { createQuestion } from "@/lib/api/question-bank"
+import { getQuestionCategories, getQuestionTypes, type QuestionCategory, type QuestionType } from "@/lib/api/lookups"
 import { DifficultyLevel } from "@/lib/types"
 import { toast } from "sonner"
-import { ArrowLeft, Plus, Trash2, GripVertical, Upload } from "lucide-react"
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  GripVertical,
+  Info,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  FileText,
+  Settings,
+  ListChecks,
+} from "lucide-react"
 import Link from "next/link"
+
+// Question Type IDs from backend
+const QUESTION_TYPE = {
+  MCQ_SINGLE: 1,
+  MCQ_MULTI: 2,
+  TRUE_FALSE: 3,
+  SHORT_ANSWER: 4,
+  ESSAY: 5,
+  NUMERIC: 6,
+}
 
 interface OptionInput {
   id: string
@@ -32,11 +55,13 @@ interface OptionInput {
 export default function CreateQuestionPage() {
   const router = useRouter()
   const { t, language } = useI18n()
+  const errorRef = useRef<HTMLDivElement>(null)
 
   const [categories, setCategories] = useState<QuestionCategory[]>([])
   const [types, setTypes] = useState<QuestionType[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [formErrors, setFormErrors] = useState<string[]>([])
 
   const [formData, setFormData] = useState({
     body: "",
@@ -52,27 +77,68 @@ export default function CreateQuestionPage() {
     { id: "2", text: "", isCorrect: false, order: 1 },
   ])
 
+  // For True/False
+  const [trueFalseAnswer, setTrueFalseAnswer] = useState<"true" | "false" | "">("")
+
+  // For Short Answer / Numeric - correct answer
+  const [correctAnswer, setCorrectAnswer] = useState("")
+
   useEffect(() => {
     fetchLookups()
   }, [])
 
+  useEffect(() => {
+    const typeId = Number(formData.questionTypeId)
+
+    if (typeId === QUESTION_TYPE.TRUE_FALSE) {
+      setOptions([
+        { id: "true", text: "True", isCorrect: false, order: 0 },
+        { id: "false", text: "False", isCorrect: false, order: 1 },
+      ])
+      setTrueFalseAnswer("")
+    } else if (typeId === QUESTION_TYPE.MCQ_SINGLE || typeId === QUESTION_TYPE.MCQ_MULTI) {
+      if (options.length === 2 && options[0].id === "true") {
+        setOptions([
+          { id: "1", text: "", isCorrect: false, order: 0 },
+          { id: "2", text: "", isCorrect: false, order: 1 },
+        ])
+      }
+    }
+  }, [formData.questionTypeId])
+
+  useEffect(() => {
+    if (formErrors.length > 0 && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: "smooth", block: "center" })
+      errorRef.current.focus()
+    }
+  }, [formErrors])
+
   const fetchLookups = async () => {
     try {
+      console.log("[v0] Fetching lookups...")
       const [categoriesRes, typesRes] = await Promise.all([getQuestionCategories(), getQuestionTypes()])
 
-      if (categoriesRes.success && categoriesRes.data) {
-        setCategories(categoriesRes.data.items)
-      }
-      if (typesRes.success && typesRes.data) {
-        setTypes(typesRes.data.items)
-        // Default to Multiple Choice
-        const mcType = typesRes.data.items.find((t) => t.nameEn === "Multiple Choice")
-        if (mcType) {
-          setFormData((prev) => ({ ...prev, questionTypeId: String(mcType.id) }))
-        }
+      console.log("[v0] Categories response:", categoriesRes)
+      console.log("[v0] Types response:", typesRes)
+
+      // Categories - response is PaginatedResponse<QuestionCategory>
+      const categoriesData = categoriesRes?.items || []
+      console.log("[v0] Categories data:", categoriesData)
+      setCategories(categoriesData)
+
+      // Types - response is PaginatedResponse<QuestionType>
+      const typesData = typesRes?.items || []
+      console.log("[v0] Types data:", typesData)
+      setTypes(typesData)
+
+      // Default to MCQ Single if available
+      if (typesData.length > 0) {
+        const mcqType = typesData.find((t) => t.id === QUESTION_TYPE.MCQ_SINGLE) || typesData[0]
+        setFormData((prev) => ({ ...prev, questionTypeId: String(mcqType.id) }))
       }
     } catch (error) {
-      console.error("Failed to fetch lookups:", error)
+      console.error("[v0] Failed to fetch lookups:", error)
+      toast.error("Failed to load question types and categories")
     }
     setIsLoading(false)
   }
@@ -98,13 +164,14 @@ export default function CreateQuestionPage() {
   }
 
   const updateOption = (id: string, updates: Partial<OptionInput>) => {
+    const typeId = Number(formData.questionTypeId)
+
     setOptions(
       options.map((opt) => {
         if (opt.id === id) {
           return { ...opt, ...updates }
         }
-        // For single-answer question types, uncheck other options when one is marked correct
-        if (updates.isCorrect && selectedType?.nameEn !== "Multiple Choice") {
+        if (updates.isCorrect && typeId === QUESTION_TYPE.MCQ_SINGLE) {
           return { ...opt, isCorrect: false }
         }
         return opt
@@ -112,62 +179,115 @@ export default function CreateQuestionPage() {
     )
   }
 
-  const selectedType = types.find((t) => String(t.id) === formData.questionTypeId)
-  const isEssayType = selectedType?.nameEn === "Essay"
+  const handleTrueFalseChange = (value: "true" | "false") => {
+    setTrueFalseAnswer(value)
+    setOptions([
+      { id: "true", text: "True", isCorrect: value === "true", order: 0 },
+      { id: "false", text: "False", isCorrect: value === "false", order: 1 },
+    ])
+  }
+
+  const selectedTypeId = Number(formData.questionTypeId)
+  const isMCQSingle = selectedTypeId === QUESTION_TYPE.MCQ_SINGLE
+  const isMCQMulti = selectedTypeId === QUESTION_TYPE.MCQ_MULTI
+  const isTrueFalse = selectedTypeId === QUESTION_TYPE.TRUE_FALSE
+  const isShortAnswer = selectedTypeId === QUESTION_TYPE.SHORT_ANSWER
+  const isEssay = selectedTypeId === QUESTION_TYPE.ESSAY
+  const isNumeric = selectedTypeId === QUESTION_TYPE.NUMERIC
+
+  const needsOptions = isMCQSingle || isMCQMulti || isTrueFalse
+  const isTextBased = isShortAnswer || isEssay || isNumeric
+
+  const validateForm = (): string[] => {
+    const errors: string[] = []
+
+    if (!formData.body.trim()) {
+      errors.push("Question body is required")
+    }
+    if (!formData.questionTypeId) {
+      errors.push("Question type is required")
+    }
+    if (!formData.questionCategoryId) {
+      errors.push("Question category is required")
+    }
+
+    if (needsOptions) {
+      const hasCorrectAnswer = options.some((opt) => opt.isCorrect)
+      if (!hasCorrectAnswer) {
+        errors.push("At least one option must be marked as correct")
+      }
+
+      if (!isTrueFalse) {
+        const hasEmptyOption = options.some((opt) => !opt.text.trim())
+        if (hasEmptyOption) {
+          errors.push("All options must have text")
+        }
+      }
+    }
+
+    if ((isShortAnswer || isNumeric) && !correctAnswer.trim()) {
+      errors.push("Please provide the correct answer")
+    }
+
+    return errors
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.body.trim()) {
-      toast.error("Question body is required")
-      return
-    }
-    if (!formData.questionTypeId) {
-      toast.error("Question type is required")
-      return
-    }
-    if (!formData.questionCategoryId) {
-      toast.error("Question category is required")
+    const errors = validateForm()
+    if (errors.length > 0) {
+      setFormErrors(errors)
       return
     }
 
-    if (!isEssayType) {
-      const hasCorrectAnswer = options.some((opt) => opt.isCorrect)
-      if (!hasCorrectAnswer) {
-        toast.error("At least one option must be marked as correct")
-        return
-      }
-      const hasEmptyOption = options.some((opt) => !opt.text.trim())
-      if (hasEmptyOption) {
-        toast.error("All options must have text")
-        return
-      }
-    }
-
+    setFormErrors([])
     setIsSaving(true)
 
-    const response = await createQuestion({
-      body: formData.body,
-      questionTypeId: Number(formData.questionTypeId),
-      questionCategoryId: Number(formData.questionCategoryId),
-      points: formData.points,
-      difficultyLevel: formData.difficultyLevel,
-      isActive: formData.isActive,
-      options: isEssayType
-        ? []
-        : options.map((opt) => ({
-            text: opt.text,
-            isCorrect: opt.isCorrect,
-            order: opt.order,
-            attachmentPath: null,
-          })),
-    })
+    let finalOptions: { text: string; isCorrect: boolean; order: number; attachmentPath: string | null }[] = []
 
-    setIsSaving(false)
+    if (needsOptions) {
+      finalOptions = options.map((opt) => ({
+        text: opt.text,
+        isCorrect: opt.isCorrect,
+        order: opt.order,
+        attachmentPath: null,
+      }))
+    } else if (isShortAnswer || isNumeric) {
+      finalOptions = [
+        {
+          text: correctAnswer,
+          isCorrect: true,
+          order: 0,
+          attachmentPath: null,
+        },
+      ]
+    }
 
-    if (response.success) {
-      toast.success("Question created successfully")
-      router.push("/question-bank")
+    try {
+      const response = await createQuestion({
+        body: formData.body,
+        questionTypeId: Number(formData.questionTypeId),
+        questionCategoryId: Number(formData.questionCategoryId),
+        points: formData.points,
+        difficultyLevel: formData.difficultyLevel,
+        isActive: formData.isActive,
+        options: finalOptions,
+      })
+
+      if (response.success) {
+        toast.success(response.message || "Question created successfully")
+        router.push("/question-bank")
+      } else {
+        const apiErrors =
+          response.errors?.length > 0 ? response.errors : [response.message || "Failed to create question"]
+        setFormErrors(apiErrors)
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An error occurred while creating the question"
+      setFormErrors([errorMessage])
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -182,12 +302,29 @@ export default function CreateQuestionPage() {
     )
   }
 
+  const ErrorAlert = () => {
+    if (formErrors.length === 0) return null
+    return (
+      <Alert variant="destructive" ref={errorRef} tabIndex={-1} className="animate-in fade-in-0 slide-in-from-top-2">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Please fix the following errors</AlertTitle>
+        <AlertDescription>
+          <ul className="list-disc list-inside mt-2 space-y-1">
+            {formErrors.map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
   return (
     <div className="flex flex-col">
       <Header title={t("questionBank.createQuestion")} subtitle="Add a new question to your bank" />
 
       <div className="flex-1 p-6">
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto max-w-4xl">
           <Button variant="ghost" asChild className="mb-6">
             <Link href="/question-bank">
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -196,16 +333,26 @@ export default function CreateQuestionPage() {
           </Button>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Question Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Question Details</CardTitle>
-                <CardDescription>Enter the question content and settings</CardDescription>
+            <ErrorAlert />
+
+            <Card className="border-2 shadow-sm">
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <FileText className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Question Details</CardTitle>
+                    <CardDescription>Enter the question content and settings</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6 pt-6">
+                {/* Question Body */}
                 <div className="space-y-2">
-                  <Label htmlFor="body">
-                    {t("questionBank.questionBody")} <span className="text-destructive">*</span>
+                  <Label htmlFor="body" className="text-sm font-semibold flex items-center gap-2">
+                    {t("questionBank.questionBody")}
+                    <span className="text-destructive">*</span>
                   </Label>
                   <Textarea
                     id="body"
@@ -213,74 +360,109 @@ export default function CreateQuestionPage() {
                     value={formData.body}
                     onChange={(e) => setFormData({ ...formData, body: e.target.value })}
                     rows={4}
-                    className="resize-none"
+                    className="resize-none text-base border-2 focus:border-primary transition-colors"
                   />
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                {/* Type and Category Row */}
+                <div className="grid gap-6 grid-cols-1 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="type">
-                      {t("questionBank.questionType")} <span className="text-destructive">*</span>
+                    <Label htmlFor="type" className="text-sm font-semibold flex items-center gap-2">
+                      {t("questionBank.questionType")}
+                      <span className="text-destructive">*</span>
                     </Label>
                     <Select
                       value={formData.questionTypeId}
                       onValueChange={(value) => setFormData({ ...formData, questionTypeId: value })}
                     >
-                      <SelectTrigger id="type">
+                      <SelectTrigger id="type" className="border-2 h-11 w-full">
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
-                        {types.map((type) => (
-                          <SelectItem key={type.id} value={String(type.id)}>
-                            {language === "ar" ? type.nameAr : type.nameEn}
+                        {types.length === 0 ? (
+                          <SelectItem value="none" disabled>
+                            No types available
                           </SelectItem>
-                        ))}
+                        ) : (
+                          types.map((type) => (
+                            <SelectItem key={type.id} value={String(type.id)}>
+                              {language === "ar" ? type.nameAr : type.nameEn}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="category">
-                      {t("questionBank.questionCategory")} <span className="text-destructive">*</span>
+                    <Label htmlFor="category" className="text-sm font-semibold flex items-center gap-2">
+                      {t("questionBank.questionCategory")}
+                      <span className="text-destructive">*</span>
                     </Label>
                     <Select
                       value={formData.questionCategoryId}
                       onValueChange={(value) => setFormData({ ...formData, questionCategoryId: value })}
                     >
-                      <SelectTrigger id="category">
+                      <SelectTrigger id="category" className="border-2 h-11 w-full">
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={String(cat.id)}>
-                            {language === "ar" ? cat.nameAr : cat.nameEn}
+                        {categories.length === 0 ? (
+                          <SelectItem value="none" disabled>
+                            No categories available
                           </SelectItem>
-                        ))}
+                        ) : (
+                          categories.map((cat) => (
+                            <SelectItem key={cat.id} value={String(cat.id)}>
+                              {language === "ar" ? cat.nameAr : cat.nameEn}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                {/* Difficulty and Points Row */}
+                <div className="grid gap-6 grid-cols-1 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="difficulty">{t("questionBank.difficulty")}</Label>
+                    <Label htmlFor="difficulty" className="text-sm font-semibold">
+                      {t("questionBank.difficulty")}
+                    </Label>
                     <Select
                       value={String(formData.difficultyLevel)}
                       onValueChange={(value) => setFormData({ ...formData, difficultyLevel: Number(value) })}
                     >
-                      <SelectTrigger id="difficulty">
+                      <SelectTrigger id="difficulty" className="border-2 h-11 w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={String(DifficultyLevel.Easy)}>{t("questionBank.easy")}</SelectItem>
-                        <SelectItem value={String(DifficultyLevel.Medium)}>{t("questionBank.medium")}</SelectItem>
-                        <SelectItem value={String(DifficultyLevel.Hard)}>{t("questionBank.hard")}</SelectItem>
+                        <SelectItem value={String(DifficultyLevel.Easy)}>
+                          <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-green-500" />
+                            {t("questionBank.easy")}
+                          </span>
+                        </SelectItem>
+                        <SelectItem value={String(DifficultyLevel.Medium)}>
+                          <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                            {t("questionBank.medium")}
+                          </span>
+                        </SelectItem>
+                        <SelectItem value={String(DifficultyLevel.Hard)}>
+                          <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-red-500" />
+                            {t("questionBank.hard")}
+                          </span>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="points">{t("common.points")}</Label>
+                    <Label htmlFor="points" className="text-sm font-semibold">
+                      {t("common.points")}
+                    </Label>
                     <Input
                       id="points"
                       type="number"
@@ -288,14 +470,21 @@ export default function CreateQuestionPage() {
                       step={0.5}
                       value={formData.points}
                       onChange={(e) => setFormData({ ...formData, points: Number(e.target.value) })}
+                      className="border-2 h-11 w-full"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div>
-                    <p className="font-medium">{t("common.active")}</p>
-                    <p className="text-sm text-muted-foreground">Question can be used in exams</p>
+                {/* Active Toggle */}
+                <div className="flex items-center justify-between rounded-xl border-2 p-4 bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                      <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{t("common.active")}</p>
+                      <p className="text-sm text-muted-foreground">Question can be used in exams</p>
+                    </div>
                   </div>
                   <Switch
                     checked={formData.isActive}
@@ -305,22 +494,34 @@ export default function CreateQuestionPage() {
               </CardContent>
             </Card>
 
-            {/* Answer Options */}
-            {!isEssayType && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("questionBank.options")}</CardTitle>
-                  <CardDescription>Add answer options and mark the correct one(s)</CardDescription>
+            {/* MCQ Single - Radio buttons for correct answer */}
+            {isMCQSingle && (
+              <Card className="border-2 shadow-sm">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 border-b">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                      <ListChecks className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">{t("questionBank.options")}</CardTitle>
+                      <CardDescription>Add answer options and select the single correct answer</CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 pt-6">
                   {options.map((option, index) => (
-                    <div key={option.id} className="flex items-start gap-3 rounded-lg border p-3">
+                    <div
+                      key={option.id}
+                      className={`flex items-start gap-3 rounded-xl border-2 p-4 transition-all ${option.isCorrect ? "border-green-500 bg-green-50 dark:bg-green-950/30" : "hover:border-muted-foreground/50"}`}
+                    >
                       <div className="flex items-center gap-2 pt-2">
                         <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                        <Checkbox
-                          id={`correct-${option.id}`}
+                        <input
+                          type="radio"
+                          name="correctAnswer"
                           checked={option.isCorrect}
-                          onCheckedChange={(checked) => updateOption(option.id, { isCorrect: checked === true })}
+                          onChange={() => updateOption(option.id, { isCorrect: true })}
+                          className="h-5 w-5 text-primary accent-primary"
                         />
                       </div>
                       <div className="flex-1 space-y-2">
@@ -332,9 +533,11 @@ export default function CreateQuestionPage() {
                           placeholder={`Option ${index + 1}`}
                           value={option.text}
                           onChange={(e) => updateOption(option.id, { text: e.target.value })}
+                          className="border-2 h-11"
                         />
                         {option.isCorrect && (
-                          <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                          <p className="text-xs text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" />
                             {t("questionBank.correctAnswer")}
                           </p>
                         )}
@@ -343,7 +546,7 @@ export default function CreateQuestionPage() {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="shrink-0"
+                        className="shrink-0 hover:bg-destructive/10"
                         onClick={() => removeOption(option.id)}
                       >
                         <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
@@ -351,7 +554,12 @@ export default function CreateQuestionPage() {
                     </div>
                   ))}
 
-                  <Button type="button" variant="outline" onClick={addOption} className="w-full bg-transparent">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addOption}
+                    className="w-full h-12 border-2 border-dashed hover:border-primary hover:bg-primary/5 bg-transparent"
+                  >
                     <Plus className="mr-2 h-4 w-4" />
                     {t("questionBank.addOption")}
                   </Button>
@@ -359,36 +567,233 @@ export default function CreateQuestionPage() {
               </Card>
             )}
 
-            {/* Attachments */}
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("questionBank.attachments")}</CardTitle>
-                <CardDescription>Add images or files to your question</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center rounded-lg border-2 border-dashed p-8">
-                  <div className="text-center">
-                    <Upload className="mx-auto h-10 w-10 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">Drag and drop files here, or click to browse</p>
-                    <Button type="button" variant="outline" className="mt-4 bg-transparent">
-                      {t("questionBank.addAttachment")}
+            {/* MCQ Multi - Checkboxes for multiple correct answers */}
+            {isMCQMulti && (
+              <Card className="border-2 shadow-sm">
+                <CardHeader className="bg-gradient-to-r from-violet-50 to-violet-100 dark:from-violet-950/50 dark:to-violet-900/30 border-b">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg">
+                      <ListChecks className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">{t("questionBank.options")}</CardTitle>
+                      <CardDescription>Add answer options and check all correct answers</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4 pt-6">
+                  <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/30">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-700 dark:text-blue-300">
+                      Multiple answers can be correct. Check all that apply.
+                    </AlertDescription>
+                  </Alert>
+
+                  {options.map((option, index) => (
+                    <div
+                      key={option.id}
+                      className={`flex items-start gap-3 rounded-xl border-2 p-4 transition-all ${option.isCorrect ? "border-green-500 bg-green-50 dark:bg-green-950/30" : "hover:border-muted-foreground/50"}`}
+                    >
+                      <div className="flex items-center gap-2 pt-2">
+                        <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                        <Checkbox
+                          id={`correct-${option.id}`}
+                          checked={option.isCorrect}
+                          onCheckedChange={(checked) => updateOption(option.id, { isCorrect: checked === true })}
+                          className="h-5 w-5"
+                        />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Label htmlFor={`option-${option.id}`} className="sr-only">
+                          Option {index + 1}
+                        </Label>
+                        <Input
+                          id={`option-${option.id}`}
+                          placeholder={`Option ${index + 1}`}
+                          value={option.text}
+                          onChange={(e) => updateOption(option.id, { text: e.target.value })}
+                          className="border-2 h-11"
+                        />
+                        {option.isCorrect && (
+                          <p className="text-xs text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" />
+                            {t("questionBank.correctAnswer")}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 hover:bg-destructive/10"
+                        onClick={() => removeOption(option.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addOption}
+                    className="w-full h-12 border-2 border-dashed hover:border-primary hover:bg-primary/5 bg-transparent"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t("questionBank.addOption")}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* True/False */}
+            {isTrueFalse && (
+              <Card className="border-2 shadow-sm">
+                <CardHeader className="bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-950/50 dark:to-amber-900/30 border-b">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
+                      <ListChecks className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Correct Answer</CardTitle>
+                      <CardDescription>Select whether the statement is true or false</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="flex gap-4">
+                    <Button
+                      type="button"
+                      variant={trueFalseAnswer === "true" ? "default" : "outline"}
+                      className={`flex-1 h-14 text-lg border-2 ${trueFalseAnswer === "true" ? "bg-green-600 hover:bg-green-700" : ""}`}
+                      onClick={() => handleTrueFalseChange("true")}
+                    >
+                      <CheckCircle2 className="mr-2 h-5 w-5" />
+                      True
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={trueFalseAnswer === "false" ? "default" : "outline"}
+                      className={`flex-1 h-14 text-lg border-2 ${trueFalseAnswer === "false" ? "bg-red-600 hover:bg-red-700" : ""}`}
+                      onClick={() => handleTrueFalseChange("false")}
+                    >
+                      <AlertCircle className="mr-2 h-5 w-5" />
+                      False
                     </Button>
                   </div>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground text-center">
-                  Note: File upload requires backend integration (backend-dependent)
-                </p>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
-            {/* Submit */}
-            <div className="flex justify-end gap-4">
-              <Button type="button" variant="outline" asChild>
+            {/* Short Answer */}
+            {isShortAnswer && (
+              <Card className="border-2 shadow-sm">
+                <CardHeader className="bg-gradient-to-r from-teal-50 to-teal-100 dark:from-teal-950/50 dark:to-teal-900/30 border-b">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-teal-100 dark:bg-teal-900/50 rounded-lg">
+                      <FileText className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Expected Answer</CardTitle>
+                      <CardDescription>Provide the correct answer for auto-grading</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="shortAnswer" className="text-sm font-semibold">
+                      Correct Answer <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="shortAnswer"
+                      placeholder="Enter the expected answer"
+                      value={correctAnswer}
+                      onChange={(e) => setCorrectAnswer(e.target.value)}
+                      className="border-2 h-11"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Numeric */}
+            {isNumeric && (
+              <Card className="border-2 shadow-sm">
+                <CardHeader className="bg-gradient-to-r from-indigo-50 to-indigo-100 dark:from-indigo-950/50 dark:to-indigo-900/30 border-b">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg">
+                      <Settings className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Numeric Answer</CardTitle>
+                      <CardDescription>Provide the correct numeric value</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="numericAnswer" className="text-sm font-semibold">
+                      Correct Value <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="numericAnswer"
+                      type="number"
+                      step="any"
+                      placeholder="Enter the numeric answer"
+                      value={correctAnswer}
+                      onChange={(e) => setCorrectAnswer(e.target.value)}
+                      className="border-2 h-11"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Essay */}
+            {isEssay && (
+              <Card className="border-2 shadow-sm">
+                <CardHeader className="bg-gradient-to-r from-rose-50 to-rose-100 dark:from-rose-950/50 dark:to-rose-900/30 border-b">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-rose-100 dark:bg-rose-900/50 rounded-lg">
+                      <FileText className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Essay Question</CardTitle>
+                      <CardDescription>This question requires manual grading</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30">
+                    <Info className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-amber-700 dark:text-amber-300">
+                      Essay questions cannot be auto-graded. Instructors will need to manually review and grade
+                      responses.
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
+            )}
+
+            <ErrorAlert />
+
+            {/* Submit Actions */}
+            <div className="flex items-center justify-end gap-4 pt-4 border-t">
+              <Button type="button" variant="outline" size="lg" asChild>
                 <Link href="/question-bank">{t("common.cancel")}</Link>
               </Button>
-              <Button type="submit" disabled={isSaving}>
-                {isSaving && <LoadingSpinner size="sm" className="mr-2" />}
-                {t("common.create")}
+              <Button type="submit" size="lg" disabled={isSaving} className="min-w-[140px]">
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Question
+                  </>
+                )}
               </Button>
             </div>
           </form>

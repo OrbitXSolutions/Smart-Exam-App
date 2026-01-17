@@ -27,6 +27,8 @@ import {
   BarChart3,
   Eye,
   Settings,
+  FolderTree,
+  ListTree,
 } from "lucide-react"
 
 interface NavItem {
@@ -60,6 +62,18 @@ const instructorNavItems: NavItem[] = [
     labelKey: "nav.questionBank",
     href: "/question-bank",
     roles: [UserRole.Admin, UserRole.Instructor],
+  },
+  {
+    icon: FolderTree,
+    labelKey: "nav.questionCategories",
+    href: "/lookups/question-categories",
+    roles: [UserRole.Admin],
+  },
+  {
+    icon: ListTree,
+    labelKey: "nav.questionTypes",
+    href: "/lookups/question-types",
+    roles: [UserRole.Admin],
   },
   {
     icon: ClipboardList,

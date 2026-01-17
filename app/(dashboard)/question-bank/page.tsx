@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useI18n } from "@/lib/i18n/context"
 import { Header } from "@/components/layout/header"
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { EmptyState } from "@/components/ui/empty-state"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,111 +31,31 @@ import {
 } from "@/components/ui/alert-dialog"
 import type { Question, QuestionCategory, QuestionType } from "@/lib/types"
 import { DifficultyLevel } from "@/lib/types"
+import { getQuestions, deleteQuestion, toggleQuestionStatus } from "@/lib/api/question-bank"
+import { getQuestionCategories, getQuestionTypes } from "@/lib/api/lookups"
 import { toast } from "sonner"
-import { Plus, Search, Filter, MoreHorizontal, Eye, Edit, Trash2, ToggleLeft, FileQuestion, X } from "lucide-react"
-
-const MOCK_QUESTIONS: Question[] = [
-  {
-    id: 1,
-    body: "What is the capital of France?",
-    questionTypeId: 1,
-    questionTypeName: "Multiple Choice",
-    questionCategoryId: 1,
-    questionCategoryName: "Geography",
-    difficultyLevel: DifficultyLevel.Easy,
-    difficultyLevelName: "Easy",
-    points: 5,
-    isActive: true,
-    options: [
-      { id: 1, body: "London", isCorrect: false },
-      { id: 2, body: "Paris", isCorrect: true },
-      { id: 3, body: "Berlin", isCorrect: false },
-      { id: 4, body: "Madrid", isCorrect: false },
-    ],
-  },
-  {
-    id: 2,
-    body: "Solve for x: 2x + 5 = 15",
-    questionTypeId: 2,
-    questionTypeName: "Short Answer",
-    questionCategoryId: 2,
-    questionCategoryName: "Mathematics",
-    difficultyLevel: DifficultyLevel.Medium,
-    difficultyLevelName: "Medium",
-    points: 10,
-    isActive: true,
-    options: [],
-  },
-  {
-    id: 3,
-    body: "The Earth revolves around the Sun.",
-    questionTypeId: 3,
-    questionTypeName: "True/False",
-    questionCategoryId: 3,
-    questionCategoryName: "Science",
-    difficultyLevel: DifficultyLevel.Easy,
-    difficultyLevelName: "Easy",
-    points: 3,
-    isActive: true,
-    options: [
-      { id: 5, body: "True", isCorrect: true },
-      { id: 6, body: "False", isCorrect: false },
-    ],
-  },
-  {
-    id: 4,
-    body: "Explain the process of photosynthesis in detail.",
-    questionTypeId: 4,
-    questionTypeName: "Essay",
-    questionCategoryId: 3,
-    questionCategoryName: "Science",
-    difficultyLevel: DifficultyLevel.Hard,
-    difficultyLevelName: "Hard",
-    points: 20,
-    isActive: false,
-    options: [],
-  },
-  {
-    id: 5,
-    body: "Which of the following are programming languages? (Select all that apply)",
-    questionTypeId: 5,
-    questionTypeName: "Multi-Select",
-    questionCategoryId: 4,
-    questionCategoryName: "Computer Science",
-    difficultyLevel: DifficultyLevel.Medium,
-    difficultyLevelName: "Medium",
-    points: 8,
-    isActive: true,
-    options: [
-      { id: 7, body: "Python", isCorrect: true },
-      { id: 8, body: "HTML", isCorrect: false },
-      { id: 9, body: "JavaScript", isCorrect: true },
-      { id: 10, body: "CSS", isCorrect: false },
-    ],
-  },
-]
-
-const MOCK_CATEGORIES: QuestionCategory[] = [
-  { id: 1, nameEn: "Geography", nameAr: "جغرافيا", isActive: true },
-  { id: 2, nameEn: "Mathematics", nameAr: "رياضيات", isActive: true },
-  { id: 3, nameEn: "Science", nameAr: "علوم", isActive: true },
-  { id: 4, nameEn: "Computer Science", nameAr: "علوم الحاسوب", isActive: true },
-]
-
-const MOCK_TYPES: QuestionType[] = [
-  { id: 1, nameEn: "Multiple Choice", nameAr: "اختيار من متعدد", isActive: true },
-  { id: 2, nameEn: "Short Answer", nameAr: "إجابة قصيرة", isActive: true },
-  { id: 3, nameEn: "True/False", nameAr: "صح/خطأ", isActive: true },
-  { id: 4, nameEn: "Essay", nameAr: "مقالي", isActive: true },
-  { id: 5, nameEn: "Multi-Select", nameAr: "اختيار متعدد", isActive: true },
-]
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreHorizontal,
+  Eye,
+  Edit,
+  Trash2,
+  ToggleLeft,
+  FileQuestion,
+  X,
+  RefreshCw,
+} from "lucide-react"
 
 export default function QuestionBankPage() {
   const { t, language } = useI18n()
 
-  const [questions, setQuestions] = useState<Question[]>(MOCK_QUESTIONS)
-  const categories = MOCK_CATEGORIES
-  const types = MOCK_TYPES
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [categories, setCategories] = useState<QuestionCategory[]>([])
+  const [types, setTypes] = useState<QuestionType[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
@@ -144,18 +65,79 @@ export default function QuestionBankPage() {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  const handleDelete = () => {
-    if (!questionToDelete) return
-    setQuestions(questions.filter((q) => q.id !== questionToDelete.id))
-    toast.success("Question deleted successfully")
-    setDeleteDialogOpen(false)
-    setQuestionToDelete(null)
+  const fetchData = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      // Fetch questions, categories, and types in parallel
+      const [questionsRes, categoriesRes, typesRes] = await Promise.all([
+        getQuestions({ pageSize: 100 }),
+        getQuestionCategories(),
+        getQuestionTypes(),
+      ])
+
+      // Handle questions response
+      if (questionsRes.success && questionsRes.data) {
+        const items = questionsRes.data.items || questionsRes.data
+        setQuestions(Array.isArray(items) ? items : [])
+      } else {
+        setQuestions([])
+      }
+
+      // Handle categories response
+      const categoriesData = categoriesRes?.items || []
+      setCategories(Array.isArray(categoriesData) ? categoriesData : [])
+
+      // Handle types response
+      const typesData = typesRes?.items || []
+      setTypes(Array.isArray(typesData) ? typesData : [])
+    } catch (err) {
+      console.error("Error fetching data:", err)
+      setError("Failed to load data. Please try again.")
+      toast.error("Failed to load questions")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleToggleStatus = (question: Question) => {
-    setQuestions(questions.map((q) => (q.id === question.id ? { ...q, isActive: !q.isActive } : q)))
-    toast.success(`Question ${question.isActive ? "deactivated" : "activated"} successfully`)
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const handleDelete = async () => {
+    if (!questionToDelete) return
+    setIsDeleting(true)
+    try {
+      const result = await deleteQuestion(questionToDelete.id)
+      if (result.success) {
+        setQuestions(questions.filter((q) => q.id !== questionToDelete.id))
+        toast.success("Question deleted successfully")
+      } else {
+        toast.error(result.message || "Failed to delete question")
+      }
+    } catch (err) {
+      toast.error("Failed to delete question")
+    } finally {
+      setIsDeleting(false)
+      setDeleteDialogOpen(false)
+      setQuestionToDelete(null)
+    }
+  }
+
+  const handleToggleStatus = async (question: Question) => {
+    try {
+      const result = await toggleQuestionStatus(question.id)
+      if (result.success) {
+        setQuestions(questions.map((q) => (q.id === question.id ? { ...q, isActive: !q.isActive } : q)))
+        toast.success(`Question ${question.isActive ? "deactivated" : "activated"} successfully`)
+      } else {
+        toast.error(result.message || "Failed to update question status")
+      }
+    } catch (err) {
+      toast.error("Failed to update question status")
+    }
   }
 
   const filteredQuestions = questions.filter((q) => {
@@ -176,6 +158,34 @@ export default function QuestionBankPage() {
 
   const hasActiveFilters =
     searchQuery || selectedCategory !== "all" || selectedType !== "all" || selectedDifficulty !== "all"
+
+  if (loading) {
+    return (
+      <div className="flex flex-col">
+        <Header title={t("questionBank.title")} subtitle={t("questionBank.subtitle")} />
+        <div className="flex-1 flex items-center justify-center p-12">
+          <LoadingSpinner size="lg" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col">
+        <Header title={t("questionBank.title")} subtitle={t("questionBank.subtitle")} />
+        <div className="flex-1 flex items-center justify-center p-12">
+          <div className="text-center space-y-4">
+            <p className="text-destructive">{error}</p>
+            <Button onClick={fetchData} variant="outline">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col">
@@ -208,6 +218,9 @@ export default function QuestionBankPage() {
                 Clear
               </Button>
             )}
+            <Button variant="outline" size="icon" onClick={fetchData} title="Refresh">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           </div>
           <Button asChild>
             <Link href="/question-bank/create">
@@ -286,13 +299,14 @@ export default function QuestionBankPage() {
             action={
               hasActiveFilters ? (
                 <Button variant="outline" onClick={clearFilters}>
+                  <X className="mr-2 h-4 w-4" />
                   Clear Filters
                 </Button>
               ) : (
                 <Button asChild>
                   <Link href="/question-bank/create">
                     <Plus className="mr-2 h-4 w-4" />
-                    {t("questionBank.createQuestion")}
+                    Create Question
                   </Link>
                 </Button>
               )
@@ -309,6 +323,7 @@ export default function QuestionBankPage() {
                   <TableRow>
                     <TableHead>Question</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Category</TableHead>
                     <TableHead>Difficulty</TableHead>
                     <TableHead>Points</TableHead>
                     <TableHead>Status</TableHead>
@@ -321,9 +336,6 @@ export default function QuestionBankPage() {
                       <TableCell>
                         <div className="max-w-md">
                           <p className="font-medium truncate">{question.body || "No question text"}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {question.questionCategoryName || "Uncategorized"}
-                          </p>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -332,7 +344,20 @@ export default function QuestionBankPage() {
                             ? types.find((t) => t.id === question.questionTypeId)?.nameAr ||
                               question.questionTypeName ||
                               "Unknown"
-                            : question.questionTypeName || "Unknown"}
+                            : types.find((t) => t.id === question.questionTypeId)?.nameEn ||
+                              question.questionTypeName ||
+                              "Unknown"}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">
+                          {language === "ar"
+                            ? categories.find((c) => c.id === question.questionCategoryId)?.nameAr ||
+                              question.questionCategoryName ||
+                              "Uncategorized"
+                            : categories.find((c) => c.id === question.questionCategoryId)?.nameEn ||
+                              question.questionCategoryName ||
+                              "Uncategorized"}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -401,12 +426,13 @@ export default function QuestionBankPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
+              disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -40,6 +40,11 @@ export default function LoginPage() {
     }
   }
 
+  const fillDemoCredentials = (userEmail: string) => {
+    setEmail(userEmail)
+    setPassword("Demo@123456")
+  }
+
   return (
     <div className="flex min-h-screen" dir={isRTL ? "rtl" : "ltr"}>
       {/* Left Side - Branding */}
@@ -183,13 +188,36 @@ export default function LoginPage() {
                   {t("auth.login")}
                 </Button>
 
-                {/* Demo credentials info */}
                 <div className="mt-4 rounded-lg bg-muted p-4 text-sm">
-                  <p className="font-medium mb-2">Demo Credentials:</p>
-                  <div className="space-y-1 text-muted-foreground">
-                    <p>Admin: admin@exam.com / password123</p>
-                    <p>Instructor: instructor@exam.com / password123</p>
-                    <p>Candidate: candidate@exam.com / password123</p>
+                  <p className="font-medium mb-3">Demo Credentials (click to fill):</p>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => fillDemoCredentials("ahmed.it.admin@examcore.com")}
+                      className="w-full text-left p-2 rounded hover:bg-background transition-colors"
+                    >
+                      <span className="font-medium text-primary">Admin:</span>{" "}
+                      <span className="text-muted-foreground">ahmed.it.admin@examcore.com</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fillDemoCredentials("sara.it.instructor@examcore.com")}
+                      className="w-full text-left p-2 rounded hover:bg-background transition-colors"
+                    >
+                      <span className="font-medium text-primary">Instructor:</span>{" "}
+                      <span className="text-muted-foreground">sara.it.instructor@examcore.com</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fillDemoCredentials("ali.it.candidate@examcore.com")}
+                      className="w-full text-left p-2 rounded hover:bg-background transition-colors"
+                    >
+                      <span className="font-medium text-primary">Candidate:</span>{" "}
+                      <span className="text-muted-foreground">ali.it.candidate@examcore.com</span>
+                    </button>
+                    <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">
+                      Password for all: <code className="bg-background px-1 py-0.5 rounded">Demo@123456</code>
+                    </p>
                   </div>
                 </div>
               </form>

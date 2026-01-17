@@ -1,10 +1,4 @@
-// API Client with JWT auth, error handling, and mock fallback support
-import { toast } from "sonner"
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "https://zoolker-003-site1.jtempurl.com").replace(
-  /\/+$/,
-  "",
-)
+const API_BASE_URL = "/api/proxy"
 
 interface ApiResponse<T> {
   success: boolean
@@ -66,10 +60,23 @@ class ApiClient {
       ...options.headers,
     }
 
+    console.log(
+      `[API Request] ${options.method || "GET"} ${url}`,
+      options.body ? JSON.parse(options.body as string) : "",
+    )
+
     try {
       const response = await fetch(url, {
         ...options,
         headers,
+      })
+
+      const jsonResponse = await response.json().catch(() => ({}))
+
+      console.log(`[API Response] ${options.method || "GET"} ${url}`, {
+        status: response.status,
+        ok: response.ok,
+        data: jsonResponse,
       })
 
       if (!response.ok) {
@@ -81,24 +88,27 @@ class ApiClient {
           throw new Error("Session expired. Please login again.")
         }
 
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.message || `HTTP Error: ${response.status}`
+        const errorMessage = jsonResponse.message || jsonResponse.errors?.join(", ") || `HTTP Error: ${response.status}`
         throw new Error(errorMessage)
       }
 
-      const jsonResponse = await response.json()
+      if (jsonResponse.success !== undefined) {
+        if (!jsonResponse.success) {
+          throw new Error(jsonResponse.message || "Operation failed")
+        }
+        return jsonResponse.data !== undefined ? jsonResponse.data : jsonResponse
+      }
+
       return jsonResponse.data !== undefined ? jsonResponse.data : jsonResponse
     } catch (error) {
+      console.error(`[API Error] ${options.method || "GET"} ${url}`, error)
+
       if (mockData !== undefined) {
         console.warn(`[API Fallback] Using mock data for ${endpoint}`)
         return mockData
       }
 
       const message = error instanceof Error ? error.message : "An error occurred"
-      // Only show toast for non-network errors
-      if (!(error instanceof TypeError && error.message.includes("fetch"))) {
-        toast.error(message)
-      }
       throw error
     }
   }
@@ -153,6 +163,8 @@ class ApiClient {
       ? `${this.baseUrl}${normalizedEndpoint}?folder=${folder}`
       : `${this.baseUrl}${normalizedEndpoint}`
 
+    console.log(`[API Upload] POST ${url}`, { fileName: file.name, size: file.size, type: file.type })
+
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -164,12 +176,15 @@ class ApiClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
+        console.error(`[API Upload Error] POST ${url}`, errorData)
         throw new Error(errorData.message || "Upload failed")
       }
 
       const jsonResponse = await response.json()
+      console.log(`[API Upload Response] POST ${url}`, jsonResponse)
       return jsonResponse.data !== undefined ? jsonResponse.data : jsonResponse
-    } catch {
+    } catch (error) {
+      console.error(`[API Upload Error] POST ${url}`, error)
       return {
         id: crypto.randomUUID(),
         originalFileName: file.name,
