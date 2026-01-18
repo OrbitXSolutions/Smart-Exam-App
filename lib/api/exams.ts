@@ -31,6 +31,16 @@ const mockExams: Exam[] = [
     passScore: 70,
     isPublished: false,
     isActive: true,
+    showResults: true,
+    allowReview: false,
+    showCorrectAnswers: false,
+    requireProctoring: false,
+    requireIdVerification: false,
+    requireWebcam: false,
+    preventCopyPaste: false,
+    preventScreenCapture: false,
+    requireFullscreen: false,
+    browserLockdown: false,
     createdDate: new Date().toISOString(),
     updatedDate: null,
     sectionsCount: 2,
@@ -59,6 +69,16 @@ const mockExams: Exam[] = [
     passScore: 60,
     isPublished: true,
     isActive: true,
+    showResults: true,
+    allowReview: true,
+    showCorrectAnswers: true,
+    requireProctoring: false,
+    requireIdVerification: false,
+    requireWebcam: false,
+    preventCopyPaste: false,
+    preventScreenCapture: false,
+    requireFullscreen: false,
+    browserLockdown: false,
     createdDate: new Date().toISOString(),
     updatedDate: null,
     sectionsCount: 1,
@@ -142,11 +162,27 @@ export interface CreateExamParams {
   startAt: string
   endAt: string
   durationMinutes: number
+  // Attempts policy
   maxAttempts: number
+  // Randomization rules
   shuffleQuestions: boolean
   shuffleOptions: boolean
+  // Passing rule
   passScore: number
   isActive: boolean
+  // Result & Review Settings
+  showResults?: boolean
+  allowReview?: boolean
+  showCorrectAnswers?: boolean
+  // Proctoring Settings
+  requireProctoring?: boolean
+  requireIdVerification?: boolean
+  requireWebcam?: boolean
+  // Security Settings
+  preventCopyPaste?: boolean
+  preventScreenCapture?: boolean
+  requireFullscreen?: boolean
+  browserLockdown?: boolean
 }
 
 export async function createExam(data: CreateExamParams): Promise<Exam> {
@@ -163,6 +199,16 @@ export async function createExam(data: CreateExamParams): Promise<Exam> {
     descriptionEn: data.descriptionEn || null,
     descriptionAr: data.descriptionAr || null,
     isPublished: false,
+    showResults: data.showResults ?? true,
+    allowReview: data.allowReview ?? false,
+    showCorrectAnswers: data.showCorrectAnswers ?? false,
+    requireProctoring: data.requireProctoring ?? false,
+    requireIdVerification: data.requireIdVerification ?? false,
+    requireWebcam: data.requireWebcam ?? false,
+    preventCopyPaste: data.preventCopyPaste ?? false,
+    preventScreenCapture: data.preventScreenCapture ?? false,
+    requireFullscreen: data.requireFullscreen ?? false,
+    browserLockdown: data.browserLockdown ?? false,
     createdDate: new Date().toISOString(),
     updatedDate: null,
     sectionsCount: 0,
@@ -585,6 +631,13 @@ export async function updateInstruction(
 
 export async function deleteInstruction(instructionId: string | number): Promise<void> {
   await apiClient.delete<void>(`/Assessment/instructions/${instructionId}`, undefined)
+}
+
+export async function reorderInstructions(
+  examId: string | number,
+  orders: Array<{ instructionId: number; newOrder: number }>
+): Promise<void> {
+  await apiClient.post<void>(`/Assessment/exams/${examId}/instructions/reorder`, orders, undefined)
 }
 
 // ============ ACCESS POLICY ============

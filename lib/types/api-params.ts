@@ -28,14 +28,16 @@ export interface GetQuestionsParams {
 }
 
 export interface CreateQuestionRequest {
-  body: string
+  bodyEn: string
+  bodyAr: string
   questionTypeId: number
   questionCategoryId: number
   points: number
   difficultyLevel: DifficultyLevel
   isActive: boolean
   options: {
-    text: string
+    textEn: string
+    textAr: string
     isCorrect: boolean
     order: number
     attachmentPath?: string | null
@@ -43,7 +45,8 @@ export interface CreateQuestionRequest {
 }
 
 export interface UpdateQuestionRequest {
-  body: string
+  bodyEn: string
+  bodyAr: string
   questionTypeId: number
   questionCategoryId: number
   points: number

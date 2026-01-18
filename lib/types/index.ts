@@ -173,7 +173,9 @@ export interface AuthResponse {
 export interface QuestionOption {
   id: number
   questionId: number
-  text: string
+  textEn: string
+  textAr: string
+  text?: string // Legacy field for backward compatibility
   isCorrect: boolean
   order: number
   attachmentPath: string | null
@@ -193,11 +195,17 @@ export interface QuestionAttachment {
 
 export interface Question {
   id: number
-  body: string
+  bodyEn: string
+  bodyAr: string
+  body?: string // Legacy field for backward compatibility
   questionTypeId: number
-  questionTypeName: string
+  questionTypeNameEn: string
+  questionTypeNameAr: string
+  questionTypeName?: string // Legacy field
   questionCategoryId: number
-  questionCategoryName: string
+  questionCategoryNameEn: string
+  questionCategoryNameAr: string
+  questionCategoryName?: string // Legacy field
   points: number
   difficultyLevel: DifficultyLevel
   difficultyLevelName: string
@@ -259,8 +267,12 @@ export interface ExamQuestion {
   points: number
   isRequired: boolean
   createdDate: string
-  questionBody: string
-  questionTypeName: string
+  questionBodyEn: string
+  questionBodyAr: string
+  questionBody?: string // Legacy field for backward compatibility
+  questionTypeNameEn: string
+  questionTypeNameAr: string
+  questionTypeName?: string // Legacy field
   difficultyLevelName: string
   originalPoints: number
 }
@@ -310,12 +322,29 @@ export interface Exam {
   startAt: string | null
   endAt: string | null
   durationMinutes: number
+  // Attempts policy
   maxAttempts: number
+  // Randomization rules
   shuffleQuestions: boolean
   shuffleOptions: boolean
+  // Passing rule
   passScore: number
   isPublished: boolean
   isActive: boolean
+  // Result & Review Settings
+  showResults: boolean
+  allowReview: boolean
+  showCorrectAnswers: boolean
+  // Proctoring Settings
+  requireProctoring: boolean
+  requireIdVerification: boolean
+  requireWebcam: boolean
+  // Security Settings
+  preventCopyPaste: boolean
+  preventScreenCapture: boolean
+  requireFullscreen: boolean
+  browserLockdown: boolean
+  // Meta
   createdDate: string
   updatedDate: string | null
   sectionsCount: number

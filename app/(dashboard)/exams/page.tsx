@@ -43,6 +43,7 @@ import {
   FileText,
   Clock,
   LayoutList,
+  Shield,
 } from "lucide-react"
 
 const MOCK_EXAMS: Exam[] = [
@@ -169,7 +170,6 @@ export default function ExamsPage() {
     try {
       setLoading(true)
       const response = await getExams()
-      console.log("[v0] Exams API response:", response)
       if (response?.items && Array.isArray(response.items)) {
         setExams(response.items)
       } else if (Array.isArray(response)) {
@@ -179,7 +179,6 @@ export default function ExamsPage() {
         setExams(MOCK_EXAMS)
       }
     } catch (error) {
-      console.log("[v0] Exams API error, using mock data:", error)
       setExams(MOCK_EXAMS)
     } finally {
       setLoading(false)
@@ -416,6 +415,12 @@ export default function ExamsPage() {
                                   {t("exams.builder")}
                                 </Link>
                               </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/exams/${exam.id}/configuration`}>
+                                  <Shield className="h-4 w-4 me-2" />
+                                  {t("exams.configuration")}
+                                </Link>
+                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               {status === "Draft" && (
                                 <DropdownMenuItem onClick={() => handlePublish(exam)}>
@@ -452,6 +457,55 @@ export default function ExamsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* How It Works Section - Always visible when exams exist */}
+      {filteredExams.length > 0 && (
+        <Card className="border-dashed">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <FileText className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">{t("exams.howItWorks")}</h3>
+                <p className="text-sm text-muted-foreground">{t("exams.howItWorksDesc")}</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <div className="w-6 h-6 rounded-full bg-primary/10 text-primary text-sm font-bold flex items-center justify-center shrink-0 mt-0.5">1</div>
+                <div>
+                  <h4 className="font-medium text-foreground text-sm">{t("exams.emptyStateStep1")}</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("exams.emptyStateStep1Desc")}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <div className="w-6 h-6 rounded-full bg-primary/10 text-primary text-sm font-bold flex items-center justify-center shrink-0 mt-0.5">2</div>
+                <div>
+                  <h4 className="font-medium text-foreground text-sm">{t("exams.emptyStateStep2")}</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("exams.emptyStateStep2Desc")}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <div className="w-6 h-6 rounded-full bg-primary/10 text-primary text-sm font-bold flex items-center justify-center shrink-0 mt-0.5">3</div>
+                <div>
+                  <h4 className="font-medium text-foreground text-sm">{t("exams.emptyStateStep3")}</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("exams.emptyStateStep3Desc")}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <div className="w-6 h-6 rounded-full bg-primary/10 text-primary text-sm font-bold flex items-center justify-center shrink-0 mt-0.5">4</div>
+                <div>
+                  <h4 className="font-medium text-foreground text-sm">{t("exams.emptyStateStep4")}</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("exams.emptyStateStep4Desc")}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

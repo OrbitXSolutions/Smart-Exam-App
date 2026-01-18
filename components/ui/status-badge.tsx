@@ -16,6 +16,7 @@ const statusVariantMap: Record<string, StatusVariant> = {
   inactive: "secondary",
   published: "success",
   unpublished: "secondary",
+  draft: "warning",
   pending: "warning",
   approved: "success",
   rejected: "destructive",
@@ -65,6 +66,16 @@ const statusVariantMap: Record<string, StatusVariant> = {
 }
 
 export function StatusBadge({ status, variant, className, showDot = true }: StatusBadgeProps) {
+  // Handle null/undefined status gracefully
+  if (!status) {
+    return (
+      <Badge variant="secondary" className={cn("gap-1.5 font-medium", className)}>
+        {showDot && <span className={cn("h-1.5 w-1.5 rounded-full bg-gray-400")} />}
+        Unknown
+      </Badge>
+    )
+  }
+  
   const normalizedStatus = status.toLowerCase().replace(/[\s_-]/g, "")
   const resolvedVariant = variant || statusVariantMap[normalizedStatus] || "default"
 

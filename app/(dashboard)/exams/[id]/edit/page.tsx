@@ -1,10 +1,11 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
 import { useI18n } from "@/lib/i18n/context"
-import { ExamType } from "@/lib/types"
+import { ExamType, type Exam } from "@/lib/types"
+import { getExam, updateExam } from "@/lib/api/exams"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,18 +14,22 @@ import { Switch } from "@/components/ui/switch"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { toast } from "sonner"
 import { ArrowLeft, Save, Zap, AlertCircle, Calendar, Clock, Timer, Target, RefreshCw, FileText, Settings } from "lucide-react"
 import Link from "next/link"
-import { apiClient } from "@/lib/api-client"
 
-export default function CreateExamPage() {
+export default function EditExamPage() {
   const { t } = useI18n()
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
+  const params = useParams()
+  const id = params.id as string
+  
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [exam, setExam] = useState<Exam | null>(null)
 
-  // Form data matching API spec - no departmentId (backend fills from user)
   const [formData, setFormData] = useState({
     examType: ExamType.Flex,
     titleEn: "",
@@ -40,6 +45,50 @@ export default function CreateExamPage() {
     passScore: 0,
     isActive: true,
   })
+
+  useEffect(() => {
+    loadExam()
+  }, [id])
+
+  async function loadExam() {
+    try {
+      setLoading(true)
+      const examData = await getExam(id)
+      setExam(examData)
+      
+      // Populate form with exam data
+      setFormData({
+        examType: examData.examType,
+        titleEn: examData.titleEn || "",
+        titleAr: examData.titleAr || "",
+        descriptionEn: examData.descriptionEn || "",
+        descriptionAr: examData.descriptionAr || "",
+        startAt: examData.startAt ? formatDateTimeLocal(examData.startAt) : "",
+        endAt: examData.endAt ? formatDateTimeLocal(examData.endAt) : "",
+        durationMinutes: examData.durationMinutes || 60,
+        maxAttempts: examData.maxAttempts || 1,
+        shuffleQuestions: examData.shuffleQuestions || false,
+        shuffleOptions: examData.shuffleOptions || false,
+        passScore: examData.passScore || 0,
+        isActive: examData.isActive ?? true,
+      })
+    } catch (err) {
+      setError("Failed to load exam")
+      toast.error("Failed to load exam")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function formatDateTimeLocal(dateString: string): string {
+    const date = new Date(dateString)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    const day = String(date.getDate()).padStart(2, "0")
+    const hours = String(date.getHours()).padStart(2, "0")
+    const minutes = String(date.getMinutes()).padStart(2, "0")
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+  }
 
   function updateField(field: string, value: string | number | boolean) {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -66,12 +115,11 @@ export default function CreateExamPage() {
     }
 
     try {
-      setLoading(true)
+      setSaving(true)
 
-      // Build request body per API spec
-      // TODO: Remove departmentId once backend fills it from current user (see BACKEND_NOTES.md)
+      // Build request body - include all required fields for PUT
       const requestBody = {
-        departmentId: 1, // Temporary hardcoded value until backend auto-fills from user
+        departmentId: exam?.departmentId || 1,
         examType: formData.examType,
         titleEn: formData.titleEn,
         titleAr: formData.titleAr || formData.titleEn,
@@ -87,41 +135,45 @@ export default function CreateExamPage() {
         isActive: formData.isActive,
       }
 
-      const response = await apiClient.post("/Assessment/exams", requestBody)
-
-      if (response?.success === false) {
-        setError(response.message || "Failed to create exam")
-        return
-      }
-
-      const examId = response?.data?.id || response?.id
-      toast.success(t("exams.createSuccess"))
-
-      if (examId) {
-        router.push(`/exams/${examId}/builder`)
-      } else {
-        router.push("/exams")
-      }
+      await updateExam(id, requestBody)
+      toast.success(t("common.saved"))
+      router.push(`/exams/${id}`)
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to create exam"
+      const errorMessage = err instanceof Error ? err.message : "Failed to update exam"
       setError(errorMessage)
       toast.error(errorMessage)
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <LoadingSpinner size="lg" />
+      </div>
+    )
+  }
+
+  if (!exam) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">{t("exams.notFound")}</p>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6 p-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
-          <Link href="/exams">
+          <Link href={`/exams/${id}`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{t("exams.create")}</h1>
-          <p className="text-muted-foreground mt-1">{t("exams.createSubtitle")}</p>
+          <h1 className="text-2xl font-bold text-foreground">{t("exams.edit")}</h1>
+          <p className="text-muted-foreground mt-1">{exam.titleEn}</p>
         </div>
       </div>
 
@@ -134,7 +186,7 @@ export default function CreateExamPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic Info - First */}
+        {/* Basic Info */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-primary">
@@ -201,7 +253,7 @@ export default function CreateExamPage() {
           </CardContent>
         </Card>
 
-        {/* Exam Type Selection - Second */}
+        {/* Exam Type Selection */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-primary">
@@ -394,11 +446,11 @@ export default function CreateExamPage() {
 
         <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" asChild>
-            <Link href="/exams">{t("common.cancel")}</Link>
+            <Link href={`/exams/${id}`}>{t("common.cancel")}</Link>
           </Button>
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={saving}>
             <Save className="h-4 w-4 me-2" />
-            {loading ? t("common.loading") : t("exams.createAndContinue")}
+            {saving ? t("common.saving") : t("common.save")}
           </Button>
         </div>
       </form>

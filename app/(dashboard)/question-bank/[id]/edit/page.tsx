@@ -24,7 +24,8 @@ import { ArrowLeft, Plus, Trash2, GripVertical } from "lucide-react"
 
 interface OptionInput {
   id: string
-  text: string
+  textEn: string
+  textAr: string
   isCorrect: boolean
   order: number
   originalId?: number
@@ -45,7 +46,8 @@ export default function EditQuestionPage() {
   const isValidId = questionId && !isNaN(Number(questionId)) && Number(questionId) > 0
 
   const [formData, setFormData] = useState({
-    body: "",
+    bodyEn: "",
+    bodyAr: "",
     questionTypeId: "",
     questionCategoryId: "",
     points: 1,
@@ -70,12 +72,12 @@ export default function EditQuestionPage() {
         getQuestionTypes(),
       ])
 
-      console.log("[v0] Edit page - questionRes:", questionRes)
       const q = (questionRes as any)?.data || questionRes
       if (q && q.id) {
         setQuestion(q)
         setFormData({
-          body: q.body || "",
+          bodyEn: q.bodyEn || q.body || "",
+          bodyAr: q.bodyAr || "",
           questionTypeId: String(q.questionTypeId || ""),
           questionCategoryId: String(q.questionCategoryId || ""),
           points: q.points || 1,
@@ -86,7 +88,8 @@ export default function EditQuestionPage() {
           setOptions(
             q.options.map((opt: any) => ({
               id: String(opt.id),
-              text: opt.text,
+              textEn: opt.textEn || opt.text || "",
+              textAr: opt.textAr || "",
               isCorrect: opt.isCorrect,
               order: opt.order,
               originalId: opt.id,
@@ -95,8 +98,6 @@ export default function EditQuestionPage() {
         }
       }
 
-      console.log("[v0] Edit page - categoriesRes:", categoriesRes)
-      console.log("[v0] Edit page - typesRes:", typesRes)
       const cats = (categoriesRes as any)?.items || categoriesRes
       const typesList = (typesRes as any)?.items || typesRes
 
@@ -123,7 +124,8 @@ export default function EditQuestionPage() {
       ...options,
       {
         id: String(Date.now()),
-        text: "",
+        textEn: "",
+        textAr: "",
         isCorrect: false,
         order: options.length,
       },
@@ -148,8 +150,8 @@ export default function EditQuestionPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.body.trim()) {
-      toast.error("Question body is required")
+    if (!formData.bodyEn.trim()) {
+      toast.error("Question body (English) is required")
       return
     }
 
@@ -165,7 +167,8 @@ export default function EditQuestionPage() {
 
     try {
       const response = await updateQuestion(Number(questionId), {
-        body: formData.body,
+        bodyEn: formData.bodyEn,
+        bodyAr: formData.bodyAr || formData.bodyEn,
         questionTypeId: Number(formData.questionTypeId),
         questionCategoryId: Number(formData.questionCategoryId),
         points: formData.points,
@@ -173,7 +176,6 @@ export default function EditQuestionPage() {
         isActive: formData.isActive,
       })
 
-      console.log("[v0] Update response:", response)
       const isSuccess = response && (response as any).success !== false
 
       if (isSuccess) {
@@ -237,18 +239,35 @@ export default function EditQuestionPage() {
                 <CardDescription>Edit the question content and settings</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="body">
-                    {t("questionBank.questionBody")} <span className="text-destructive">*</span>
-                  </Label>
-                  <Textarea
-                    id="body"
-                    placeholder="Enter your question here..."
-                    value={formData.body}
-                    onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                    rows={4}
-                    className="resize-none"
-                  />
+                {/* Question Body - Bilingual */}
+                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="bodyEn">
+                      {t("questionBank.questionBody")} (English) <span className="text-destructive">*</span>
+                    </Label>
+                    <Textarea
+                      id="bodyEn"
+                      placeholder="Enter your question in English..."
+                      value={formData.bodyEn}
+                      onChange={(e) => setFormData({ ...formData, bodyEn: e.target.value })}
+                      rows={4}
+                      className="resize-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bodyAr">
+                      {t("questionBank.questionBody")} (العربية)
+                    </Label>
+                    <Textarea
+                      id="bodyAr"
+                      placeholder="أدخل سؤالك بالعربية..."
+                      value={formData.bodyAr}
+                      onChange={(e) => setFormData({ ...formData, bodyAr: e.target.value })}
+                      rows={4}
+                      dir="rtl"
+                      className="resize-none"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -353,21 +372,37 @@ export default function EditQuestionPage() {
                       <div className="flex items-center gap-2 pt-2">
                         <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
                         <Checkbox
-                          id={`correct-${option.id}`}
+                          id={`correct-edit-${option.id}`}
                           checked={option.isCorrect}
                           onCheckedChange={(checked) => updateOption(option.id, { isCorrect: checked === true })}
                         />
                       </div>
-                      <div className="flex-1 space-y-2">
-                        <Label htmlFor={`option-${option.id}`} className="sr-only">
-                          Option {index + 1}
-                        </Label>
-                        <Input
-                          id={`option-${option.id}`}
-                          placeholder={`Option ${index + 1}`}
-                          value={option.text}
-                          onChange={(e) => updateOption(option.id, { text: e.target.value })}
-                        />
+                      <div className="flex-1 space-y-3">
+                        <div className="grid gap-2 grid-cols-1 lg:grid-cols-2">
+                          <div>
+                            <Label htmlFor={`option-edit-en-${option.id}`} className="text-xs text-muted-foreground">
+                              English
+                            </Label>
+                            <Input
+                              id={`option-edit-en-${option.id}`}
+                              placeholder={`Option ${index + 1} (English)`}
+                              value={option.textEn}
+                              onChange={(e) => updateOption(option.id, { textEn: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`option-edit-ar-${option.id}`} className="text-xs text-muted-foreground">
+                              العربية
+                            </Label>
+                            <Input
+                              id={`option-edit-ar-${option.id}`}
+                              placeholder={`الخيار ${index + 1}`}
+                              value={option.textAr}
+                              onChange={(e) => updateOption(option.id, { textAr: e.target.value })}
+                              dir="rtl"
+                            />
+                          </div>
+                        </div>
                         {option.isCorrect && (
                           <p className="text-xs text-green-600 dark:text-green-400 font-medium">
                             {t("questionBank.correctAnswer")}

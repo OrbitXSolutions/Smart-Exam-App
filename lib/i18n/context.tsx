@@ -5,8 +5,9 @@ import { translations, type Language } from "./translations"
 
 interface I18nContextType {
   language: Language
+  locale: Language // Alias for language
   setLanguage: (lang: Language) => void
-  t: (key: string) => string
+  t: (key: string, params?: Record<string, string | number>) => string
   isRTL: boolean
   dir: "ltr" | "rtl"
 }
@@ -33,7 +34,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("language", lang)
   }
 
-  const t = (key: string): string => {
+  const t = (key: string, params?: Record<string, string | number>): string => {
     const keys = key.split(".")
     let value: unknown = translations[language]
 
@@ -45,13 +46,22 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    return typeof value === "string" ? value : key
+    let result = typeof value === "string" ? value : key
+    
+    // Replace parameters like {passScore} with actual values
+    if (params) {
+      for (const [paramKey, paramValue] of Object.entries(params)) {
+        result = result.replace(new RegExp(`\\{${paramKey}\\}`, "g"), String(paramValue))
+      }
+    }
+    
+    return result
   }
 
   const isRTL = language === "ar"
   const dir = isRTL ? "rtl" : "ltr"
 
-  return <I18nContext.Provider value={{ language, setLanguage, t, isRTL, dir }}>{children}</I18nContext.Provider>
+  return <I18nContext.Provider value={{ language, locale: language, setLanguage, t, isRTL, dir }}>{children}</I18nContext.Provider>
 }
 
 export function useI18n() {

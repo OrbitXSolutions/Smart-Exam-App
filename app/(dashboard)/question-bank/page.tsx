@@ -137,8 +137,10 @@ export default function QuestionBankPage() {
   }
 
   const filteredQuestions = questions.filter((q) => {
-    const body = q.body || ""
-    const matchesSearch = !searchQuery || body.toLowerCase().includes(searchQuery.toLowerCase())
+    const bodyEn = q.bodyEn || q.body || ""
+    const bodyAr = q.bodyAr || ""
+    const searchLower = searchQuery.toLowerCase()
+    const matchesSearch = !searchQuery || bodyEn.toLowerCase().includes(searchLower) || bodyAr.toLowerCase().includes(searchLower)
     const matchesCategory = selectedCategory === "all" || q.questionCategoryId === Number(selectedCategory)
     const matchesType = selectedType === "all" || q.questionTypeId === Number(selectedType)
     const matchesDifficulty = selectedDifficulty === "all" || q.difficultyLevel === Number(selectedDifficulty)
@@ -331,16 +333,21 @@ export default function QuestionBankPage() {
                     <TableRow key={question.id}>
                       <TableCell>
                         <div className="max-w-md">
-                          <p className="font-medium truncate">{question.body || "No question text"}</p>
+                          <p className="font-medium truncate">
+                            {language === "ar" 
+                              ? (question.bodyAr || question.bodyEn || question.body || "No question text")
+                              : (question.bodyEn || question.body || "No question text")}
+                          </p>
                         </div>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm">
                           {language === "ar"
-                            ? types.find((t) => t.id === question.questionTypeId)?.nameAr ||
+                            ? question.questionTypeNameAr ||
+                              question.questionTypeNameEn ||
                               question.questionTypeName ||
                               "Unknown"
-                            : types.find((t) => t.id === question.questionTypeId)?.nameEn ||
+                            : question.questionTypeNameEn ||
                               question.questionTypeName ||
                               "Unknown"}
                         </span>
@@ -348,10 +355,11 @@ export default function QuestionBankPage() {
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
                           {language === "ar"
-                            ? categories.find((c) => c.id === question.questionCategoryId)?.nameAr ||
+                            ? question.questionCategoryNameAr ||
+                              question.questionCategoryNameEn ||
                               question.questionCategoryName ||
                               "Uncategorized"
-                            : categories.find((c) => c.id === question.questionCategoryId)?.nameEn ||
+                            : question.questionCategoryNameEn ||
                               question.questionCategoryName ||
                               "Uncategorized"}
                         </span>

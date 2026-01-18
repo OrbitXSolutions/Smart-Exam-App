@@ -47,7 +47,8 @@ const QUESTION_TYPE = {
 
 interface OptionInput {
   id: string
-  text: string
+  textEn: string
+  textAr: string
   isCorrect: boolean
   order: number
 }
@@ -64,7 +65,8 @@ const CreateQuestionPage = () => {
   const [formErrors, setFormErrors] = useState<string[]>([])
 
   const [formData, setFormData] = useState({
-    body: "",
+    bodyEn: "",
+    bodyAr: "",
     questionTypeId: "",
     questionCategoryId: "",
     points: 1,
@@ -73,8 +75,8 @@ const CreateQuestionPage = () => {
   })
 
   const [options, setOptions] = useState<OptionInput[]>([
-    { id: "1", text: "", isCorrect: false, order: 0 },
-    { id: "2", text: "", isCorrect: false, order: 1 },
+    { id: "1", textEn: "", textAr: "", isCorrect: false, order: 0 },
+    { id: "2", textEn: "", textAr: "", isCorrect: false, order: 1 },
   ])
 
   // For True/False
@@ -92,15 +94,15 @@ const CreateQuestionPage = () => {
 
     if (typeId === QUESTION_TYPE.TRUE_FALSE) {
       setOptions([
-        { id: "true", text: "True", isCorrect: false, order: 0 },
-        { id: "false", text: "False", isCorrect: false, order: 1 },
+        { id: "true", textEn: "True", textAr: "صحيح", isCorrect: false, order: 0 },
+        { id: "false", textEn: "False", textAr: "خطأ", isCorrect: false, order: 1 },
       ])
       setTrueFalseAnswer("")
     } else if (typeId === QUESTION_TYPE.MCQ_SINGLE || typeId === QUESTION_TYPE.MCQ_MULTI) {
       if (options.length === 2 && options[0].id === "true") {
         setOptions([
-          { id: "1", text: "", isCorrect: false, order: 0 },
-          { id: "2", text: "", isCorrect: false, order: 1 },
+          { id: "1", textEn: "", textAr: "", isCorrect: false, order: 0 },
+          { id: "2", textEn: "", textAr: "", isCorrect: false, order: 1 },
         ])
       }
     }
@@ -115,20 +117,14 @@ const CreateQuestionPage = () => {
 
   const fetchLookups = async () => {
     try {
-      console.log("[v0] Fetching lookups...")
       const [categoriesRes, typesRes] = await Promise.all([getQuestionCategories(), getQuestionTypes()])
-
-      console.log("[v0] Categories response:", categoriesRes)
-      console.log("[v0] Types response:", typesRes)
 
       // Categories - response is PaginatedResponse<QuestionCategory>
       const categoriesData = categoriesRes?.items || []
-      console.log("[v0] Categories data:", categoriesData)
       setCategories(categoriesData)
 
       // Types - response is PaginatedResponse<QuestionType>
       const typesData = typesRes?.items || []
-      console.log("[v0] Types data:", typesData)
       setTypes(typesData)
 
       // Default to MCQ Single if available
@@ -148,7 +144,8 @@ const CreateQuestionPage = () => {
       ...options,
       {
         id: String(Date.now()),
-        text: "",
+        textEn: "",
+        textAr: "",
         isCorrect: false,
         order: options.length,
       },
@@ -182,8 +179,8 @@ const CreateQuestionPage = () => {
   const handleTrueFalseChange = (value: "true" | "false") => {
     setTrueFalseAnswer(value)
     setOptions([
-      { id: "true", text: "True", isCorrect: value === "true", order: 0 },
-      { id: "false", text: "False", isCorrect: value === "false", order: 1 },
+      { id: "true", textEn: "True", textAr: "صحيح", isCorrect: value === "true", order: 0 },
+      { id: "false", textEn: "False", textAr: "خطأ", isCorrect: value === "false", order: 1 },
     ])
   }
 
@@ -201,8 +198,8 @@ const CreateQuestionPage = () => {
   const validateForm = (): string[] => {
     const errors: string[] = []
 
-    if (!formData.body.trim()) {
-      errors.push("Question body is required")
+    if (!formData.bodyEn.trim()) {
+      errors.push("Question body (English) is required")
     }
     if (!formData.questionTypeId) {
       errors.push("Question type is required")
@@ -218,9 +215,9 @@ const CreateQuestionPage = () => {
       }
 
       if (!isTrueFalse) {
-        const hasEmptyOption = options.some((opt) => !opt.text.trim())
+        const hasEmptyOption = options.some((opt) => !opt.textEn.trim())
         if (hasEmptyOption) {
-          errors.push("All options must have text")
+          errors.push("All options must have text (English)")
         }
       }
     }
@@ -244,11 +241,12 @@ const CreateQuestionPage = () => {
     setFormErrors([])
     setIsSaving(true)
 
-    let finalOptions: { text: string; isCorrect: boolean; order: number; attachmentPath: string | null }[] = []
+    let finalOptions: { textEn: string; textAr: string; isCorrect: boolean; order: number; attachmentPath: string | null }[] = []
 
     if (needsOptions) {
       finalOptions = options.map((opt) => ({
-        text: opt.text,
+        textEn: opt.textEn,
+        textAr: opt.textAr || opt.textEn, // Fallback to English if Arabic is empty
         isCorrect: opt.isCorrect,
         order: opt.order,
         attachmentPath: null,
@@ -256,7 +254,8 @@ const CreateQuestionPage = () => {
     } else if (isShortAnswer || isNumeric) {
       finalOptions = [
         {
-          text: correctAnswer,
+          textEn: correctAnswer,
+          textAr: correctAnswer, // Use same value for both languages for short answer
           isCorrect: true,
           order: 0,
           attachmentPath: null,
@@ -266,7 +265,8 @@ const CreateQuestionPage = () => {
 
     try {
       const response = await createQuestion({
-        body: formData.body,
+        bodyEn: formData.bodyEn,
+        bodyAr: formData.bodyAr || formData.bodyEn, // Fallback to English if Arabic is empty
         questionTypeId: Number(formData.questionTypeId),
         questionCategoryId: Number(formData.questionCategoryId),
         points: formData.points,
@@ -360,20 +360,36 @@ const CreateQuestionPage = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 pt-6">
-                {/* Question Body */}
-                <div className="space-y-2">
-                  <Label htmlFor="body" className="text-sm font-semibold flex items-center gap-2">
-                    {t("questionBank.questionBody")}
-                    <span className="text-destructive">*</span>
-                  </Label>
-                  <Textarea
-                    id="body"
-                    placeholder="Enter your question here..."
-                    value={formData.body}
-                    onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                    rows={4}
-                    className="resize-none text-base border-2 focus:border-primary transition-colors"
-                  />
+                {/* Question Body - Bilingual */}
+                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="bodyEn" className="text-sm font-semibold flex items-center gap-2">
+                      {t("questionBank.questionBody")} (English)
+                      <span className="text-destructive">*</span>
+                    </Label>
+                    <Textarea
+                      id="bodyEn"
+                      placeholder="Enter your question in English..."
+                      value={formData.bodyEn}
+                      onChange={(e) => setFormData({ ...formData, bodyEn: e.target.value })}
+                      rows={4}
+                      className="resize-none text-base border-2 focus:border-primary transition-colors"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bodyAr" className="text-sm font-semibold flex items-center gap-2">
+                      {t("questionBank.questionBody")} (العربية)
+                    </Label>
+                    <Textarea
+                      id="bodyAr"
+                      placeholder="أدخل سؤالك بالعربية..."
+                      value={formData.bodyAr}
+                      onChange={(e) => setFormData({ ...formData, bodyAr: e.target.value })}
+                      rows={4}
+                      dir="rtl"
+                      className="resize-none text-base border-2 focus:border-primary transition-colors"
+                    />
+                  </div>
                 </div>
 
                 {/* Type and Category Row */}
@@ -536,17 +552,34 @@ const CreateQuestionPage = () => {
                           className="h-5 w-5 text-primary accent-primary"
                         />
                       </div>
-                      <div className="flex-1 space-y-2">
-                        <Label htmlFor={`option-${option.id}`} className="sr-only">
-                          Option {index + 1}
-                        </Label>
-                        <Input
-                          id={`option-${option.id}`}
-                          placeholder={`Option ${index + 1}`}
-                          value={option.text}
-                          onChange={(e) => updateOption(option.id, { text: e.target.value })}
-                          className="border-2 h-11"
-                        />
+                      <div className="flex-1 space-y-3">
+                        <div className="grid gap-2 grid-cols-1 lg:grid-cols-2">
+                          <div>
+                            <Label htmlFor={`option-single-en-${option.id}`} className="text-xs text-muted-foreground">
+                              English
+                            </Label>
+                            <Input
+                              id={`option-single-en-${option.id}`}
+                              placeholder={`Option ${index + 1} (English)`}
+                              value={option.textEn}
+                              onChange={(e) => updateOption(option.id, { textEn: e.target.value })}
+                              className="border-2 h-10"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`option-single-ar-${option.id}`} className="text-xs text-muted-foreground">
+                              العربية
+                            </Label>
+                            <Input
+                              id={`option-single-ar-${option.id}`}
+                              placeholder={`الخيار ${index + 1}`}
+                              value={option.textAr}
+                              onChange={(e) => updateOption(option.id, { textAr: e.target.value })}
+                              className="border-2 h-10"
+                              dir="rtl"
+                            />
+                          </div>
+                        </div>
                         {option.isCorrect && (
                           <p className="text-xs text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
                             <CheckCircle2 className="h-3 w-3" />
@@ -609,23 +642,40 @@ const CreateQuestionPage = () => {
                       <div className="flex items-center gap-2 pt-2">
                         <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
                         <Checkbox
-                          id={`correct-${option.id}`}
+                          id={`correct-multi-${option.id}`}
                           checked={option.isCorrect}
                           onCheckedChange={(checked) => updateOption(option.id, { isCorrect: checked === true })}
                           className="h-5 w-5"
                         />
                       </div>
-                      <div className="flex-1 space-y-2">
-                        <Label htmlFor={`option-${option.id}`} className="sr-only">
-                          Option {index + 1}
-                        </Label>
-                        <Input
-                          id={`option-${option.id}`}
-                          placeholder={`Option ${index + 1}`}
-                          value={option.text}
-                          onChange={(e) => updateOption(option.id, { text: e.target.value })}
-                          className="border-2 h-11"
-                        />
+                      <div className="flex-1 space-y-3">
+                        <div className="grid gap-2 grid-cols-1 lg:grid-cols-2">
+                          <div>
+                            <Label htmlFor={`option-multi-en-${option.id}`} className="text-xs text-muted-foreground">
+                              English
+                            </Label>
+                            <Input
+                              id={`option-multi-en-${option.id}`}
+                              placeholder={`Option ${index + 1} (English)`}
+                              value={option.textEn}
+                              onChange={(e) => updateOption(option.id, { textEn: e.target.value })}
+                              className="border-2 h-10"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`option-multi-ar-${option.id}`} className="text-xs text-muted-foreground">
+                              العربية
+                            </Label>
+                            <Input
+                              id={`option-multi-ar-${option.id}`}
+                              placeholder={`الخيار ${index + 1}`}
+                              value={option.textAr}
+                              onChange={(e) => updateOption(option.id, { textAr: e.target.value })}
+                              className="border-2 h-10"
+                              dir="rtl"
+                            />
+                          </div>
+                        </div>
                         {option.isCorrect && (
                           <p className="text-xs text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
                             <CheckCircle2 className="h-3 w-3" />

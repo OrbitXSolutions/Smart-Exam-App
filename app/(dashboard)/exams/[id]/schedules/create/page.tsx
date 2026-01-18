@@ -87,7 +87,7 @@ export default function CreateSchedulePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
           <Link href={`/exams/${id}`}>
@@ -96,14 +96,14 @@ export default function CreateSchedulePage() {
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t("exams.createSchedule")}</h1>
-          <p className="text-muted-foreground mt-1">{exam?.title}</p>
+          <p className="text-muted-foreground mt-1">{exam?.titleEn || exam?.title}</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="border-b bg-muted/30">
+            <CardTitle className="flex items-center gap-2 text-primary">
               <Calendar className="h-5 w-5" />
               {t("exams.scheduleDetails")}
             </CardTitle>
@@ -167,11 +167,12 @@ export default function CreateSchedulePage() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="border-b bg-muted/30">
+            <CardTitle className="flex items-center gap-2 text-primary">
               <Users className="h-5 w-5" />
               {t("exams.capacitySettings")}
             </CardTitle>
+            <CardDescription>{t("exams.capacitySettingsDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">

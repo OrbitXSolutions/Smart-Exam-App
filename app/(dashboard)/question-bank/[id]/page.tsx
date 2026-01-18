@@ -62,8 +62,6 @@ export default function QuestionDetailPage() {
   const fetchQuestion = async () => {
     try {
       const response = await getQuestionById(numericId)
-      console.log("[v0] Detail page - response:", response)
-
       const q = (response as any)?.data || response
       if (q && q.id) {
         setQuestion(q)
@@ -177,7 +175,11 @@ export default function QuestionDetailPage() {
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <CardTitle>Question</CardTitle>
-                    <CardDescription>{question.questionTypeName}</CardDescription>
+                    <CardDescription>
+                      {language === "ar"
+                        ? (question.questionTypeNameAr || question.questionTypeNameEn || question.questionTypeName)
+                        : (question.questionTypeNameEn || question.questionTypeName)}
+                    </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
                     <StatusBadge status={question.difficultyLevelName} />
@@ -186,7 +188,20 @@ export default function QuestionDetailPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-lg leading-relaxed">{question.body}</p>
+                <div className="space-y-4">
+                  {/* English Body */}
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">English</p>
+                    <p className="text-lg leading-relaxed">{question.bodyEn || question.body || "No question text"}</p>
+                  </div>
+                  {/* Arabic Body */}
+                  {question.bodyAr && (
+                    <div dir="rtl">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">العربية</p>
+                      <p className="text-lg leading-relaxed">{question.bodyAr}</p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -213,7 +228,11 @@ export default function QuestionDetailPage() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">{t("common.category")}</p>
-                      <p className="font-medium">{question.questionCategoryName}</p>
+                      <p className="font-medium">
+                        {language === "ar"
+                          ? (question.questionCategoryNameAr || question.questionCategoryNameEn || question.questionCategoryName)
+                          : (question.questionCategoryNameEn || question.questionCategoryName)}
+                      </p>
                     </div>
                   </div>
 
@@ -274,7 +293,12 @@ export default function QuestionDetailPage() {
                         >
                           {String.fromCharCode(65 + index)}
                         </div>
-                        <p className={`flex-1 ${option.isCorrect ? "font-medium" : ""}`}>{option.text}</p>
+                        <div className={`flex-1 ${option.isCorrect ? "font-medium" : ""}`}>
+                          <p>{language === "ar" ? (option.textAr || option.textEn || option.text) : (option.textEn || option.text)}</p>
+                          {language === "en" && option.textAr && (
+                            <p className="text-sm text-muted-foreground mt-1" dir="rtl">{option.textAr}</p>
+                          )}
+                        </div>
                         {option.isCorrect ? (
                           <Check className="h-5 w-5 text-green-500" />
                         ) : (
