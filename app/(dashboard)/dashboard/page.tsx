@@ -85,130 +85,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Charts Row */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Attempts Over Time */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                {t("dashboard.attemptsOverTime")}
-              </CardTitle>
-              <CardDescription>Exam attempts in the last 7 weeks</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={stats.attemptsOverTime}>
-                    <defs>
-                      <linearGradient id="colorAttempts" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
-                    <YAxis className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="count"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      fill="url(#colorAttempts)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Risk Distribution */}
-          {isAdmin && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-primary" />
-                  {t("dashboard.riskDistribution")}
-                </CardTitle>
-                <CardDescription>Proctor session risk levels</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={stats.riskDistribution}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={4}
-                        dataKey="count"
-                        nameKey="level"
-                        label={({ level, percent }) => `${level} ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {stats.riskDistribution.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Pass Rate by Exam (for non-admin) */}
-          {!isAdmin && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Pass Rate by Subject</CardTitle>
-                <CardDescription>Your performance across different subjects</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={stats.passRateByExam} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
-                      <XAxis type="number" domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))" }} />
-                      <YAxis
-                        dataKey="examTitle"
-                        type="category"
-                        width={100}
-                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                        formatter={(value: number) => [`${value}%`, "Pass Rate"]}
-                      />
-                      <Bar dataKey="passRate" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Quick Actions & Recent Activity */}
+        {/* Quick Actions, Upcoming Exams & Recent Activity - 3 columns */}
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Quick Actions */}
           <Card>
@@ -250,20 +127,20 @@ export default function DashboardPage() {
               ) : (
                 <>
                   <Button variant="outline" className="justify-start h-auto py-3 bg-transparent" asChild>
-                    <Link href="/candidate/exams">
+                    <Link href="/my-exams">
                       <ClipboardList className="mr-3 h-5 w-5 text-primary" />
                       <div className="text-left">
-                        <p className="font-medium">Available Exams</p>
-                        <p className="text-xs text-muted-foreground">View and start exams</p>
+                        <p className="font-medium">{t("myExams.availableExams")}</p>
+                        <p className="text-xs text-muted-foreground">{t("myExams.viewAndStart")}</p>
                       </div>
                     </Link>
                   </Button>
                   <Button variant="outline" className="justify-start h-auto py-3 bg-transparent" asChild>
-                    <Link href="/candidate/results">
+                    <Link href="/my-results">
                       <CheckCircle className="mr-3 h-5 w-5 text-primary" />
                       <div className="text-left">
-                        <p className="font-medium">My Results</p>
-                        <p className="text-xs text-muted-foreground">View exam scores</p>
+                        <p className="font-medium">{t("myExams.myResults")}</p>
+                        <p className="text-xs text-muted-foreground">{t("myExams.viewScores")}</p>
                       </div>
                     </Link>
                   </Button>
@@ -280,7 +157,7 @@ export default function DashboardPage() {
                 <CardDescription>Scheduled examinations</CardDescription>
               </div>
               <Button variant="ghost" size="sm" asChild>
-                <Link href={isAdmin ? "/exams" : "/candidate/exams"}>
+                <Link href={isAdmin ? "/exams" : "/my-exams"}>
                   View all
                   <ArrowRight className="ml-1 h-4 w-4" />
                 </Link>
@@ -393,6 +270,126 @@ export default function DashboardPage() {
                     )}
                   </div>
                 ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Charts Row - 2 columns */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Attempts Over Time */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                {t("dashboard.attemptsOverTime")}
+              </CardTitle>
+              <CardDescription>Exam attempts in the last 7 weeks</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={stats.attemptsOverTime}>
+                    <defs>
+                      <linearGradient id="colorAttempts" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="date" className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="count"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      fill="url(#colorAttempts)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Risk Distribution (Admin) / Pass Rate by Subject (Candidate) */}
+          {isAdmin ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-primary" />
+                  {t("dashboard.riskDistribution")}
+                </CardTitle>
+                <CardDescription>Proctor session risk levels</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={stats.riskDistribution}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={4}
+                        dataKey="count"
+                        nameKey="level"
+                        label={({ level, percent }) => `${level} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {stats.riskDistribution.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Pass Rate by Subject</CardTitle>
+                <CardDescription>Your performance across different subjects</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats.passRateByExam} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
+                      <XAxis type="number" domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))" }} />
+                      <YAxis
+                        dataKey="examTitle"
+                        type="category"
+                        width={100}
+                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                        formatter={(value: number) => [`${value}%`, "Pass Rate"]}
+                      />
+                      <Bar dataKey="passRate" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </CardContent>
             </Card>
           )}

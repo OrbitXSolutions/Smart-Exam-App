@@ -4,68 +4,54 @@ import { useState, useEffect } from "react"
 import { useParams, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useI18n } from "@/lib/i18n/context"
+import { getMyResult, type CandidateResult } from "@/lib/api/candidate"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
-import { CheckCircle2, XCircle, Trophy, Clock, Target, FileText, ArrowLeft, Download, Share2 } from "lucide-react"
+import { CheckCircle2, XCircle, Trophy, Clock, Target, FileText, ArrowLeft, Download, Share2, AlertCircle } from "lucide-react"
 
-interface ExamResult {
-  id: string
-  examTitle: string
-  examCode: string
-  submittedAt: string
-  duration: number
-  score: number
-  passingScore: number
-  passed: boolean
-  totalQuestions: number
-  correctAnswers: number
-  incorrectAnswers: number
-  unanswered: number
-  sections: {
-    title: string
-    score: number
-    totalPoints: number
-    questions: number
-    correct: number
-  }[]
+// Helper function to get localized field
+function getLocalizedField<T extends Record<string, unknown>>(
+  obj: T,
+  fieldBase: string,
+  language: string
+): string {
+  const field = language === "ar" ? `${fieldBase}Ar` : `${fieldBase}En`
+  const fallback = language === "ar" ? `${fieldBase}En` : `${fieldBase}Ar`
+  return (obj[field] as string) || (obj[fallback] as string) || ""
 }
 
 export default function ResultsPage() {
   const { id } = useParams<{ id: string }>()
+  const attemptId = Number.parseInt(id, 10)
   const searchParams = useSearchParams()
   const justSubmitted = searchParams.get("submitted") === "true"
-  const { t } = useI18n()
-  const [result, setResult] = useState<ExamResult | null>(null)
+  const { t, language } = useI18n()
+  const [result, setResult] = useState<CandidateResult | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Simulate loading results
-    setTimeout(() => {
-      setResult({
-        id,
-        examTitle: "Mathematics Final Exam",
-        examCode: "MATH-2024-FINAL",
-        submittedAt: new Date().toISOString(),
-        duration: 95, // minutes taken
-        score: 85,
-        passingScore: 70,
-        passed: true,
-        totalQuestions: 25,
-        correctAnswers: 21,
-        incorrectAnswers: 3,
-        unanswered: 1,
-        sections: [
-          { title: "Multiple Choice", score: 45, totalPoints: 50, questions: 10, correct: 9 },
-          { title: "True/False", score: 15, totalPoints: 15, questions: 5, correct: 5 },
-          { title: "Short Answer", score: 25, totalPoints: 35, questions: 10, correct: 7 },
-        ],
-      })
+    loadResult()
+  }, [attemptId])
+
+  async function loadResult() {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const data = await getMyResult(attemptId)
+      console.log("[v0] Result loaded:", data)
+      setResult(data)
+    } catch (err) {
+      console.error("[v0] Error loading result:", err)
+      setError(t("results.notAvailable"))
+    } finally {
       setLoading(false)
-    }, 1500)
-  }, [id])
+    }
+  }
 
   if (loading) {
     return (
@@ -78,7 +64,32 @@ export default function ResultsPage() {
     )
   }
 
-  if (!result) return null
+  if (error || !result) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Card className="max-w-md w-full mx-4">
+          <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
+            <AlertCircle className="h-12 w-12 text-muted-foreground" />
+            <div>
+              <h2 className="text-lg font-semibold">{t("results.notAvailable")}</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {t("results.notAvailableDesc")}
+              </p>
+            </div>
+            <Button asChild>
+              <Link href="/my-exams">
+                <ArrowLeft className="h-4 w-4 me-2" />
+                {t("results.backToExams")}
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Check if results are hidden (all score fields are null)
+  const showScores = result.totalScore !== null
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -92,144 +103,218 @@ export default function ResultsPage() {
               </Link>
             </Button>
             <div>
-              <h1 className="font-semibold">{result.examTitle}</h1>
-              <p className="text-sm text-muted-foreground">{result.examCode}</p>
+              <h1 className="font-semibold">{getLocalizedField(result, "examTitle", language)}</h1>
+              <p className="text-sm text-muted-foreground">
+                {t("results.attempt")} #{result.attemptNumber}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 me-2" />
-              {t("results.download")}
-            </Button>
-            <Button variant="outline" size="sm">
-              <Share2 className="h-4 w-4 me-2" />
-              {t("results.share")}
-            </Button>
-          </div>
+          {showScores && (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="bg-transparent">
+                <Download className="h-4 w-4 me-2" />
+                {t("results.download")}
+              </Button>
+              <Button variant="outline" size="sm" className="bg-transparent">
+                <Share2 className="h-4 w-4 me-2" />
+                {t("results.share")}
+              </Button>
+            </div>
+          )}
         </div>
       </header>
 
       <main className="container py-8 max-w-4xl">
-        {/* Success/Failure Banner */}
-        <Card
-          className={`mb-8 overflow-hidden ${
-            result.passed
-              ? "border-emerald-500/50 bg-gradient-to-r from-emerald-500/10 to-transparent"
-              : "border-red-500/50 bg-gradient-to-r from-red-500/10 to-transparent"
-          }`}
-        >
-          <CardContent className="flex items-center gap-6 p-6">
-            <div
-              className={`flex h-20 w-20 items-center justify-center rounded-full ${
-                result.passed ? "bg-emerald-500/20" : "bg-red-500/20"
-              }`}
-            >
-              {result.passed ? (
-                <Trophy className="h-10 w-10 text-emerald-500" />
-              ) : (
-                <XCircle className="h-10 w-10 text-red-500" />
-              )}
-            </div>
-            <div className="flex-1">
-              <h2 className={`text-2xl font-bold ${result.passed ? "text-emerald-600" : "text-red-600"}`}>
-                {result.passed ? t("results.congratulations") : t("results.tryAgain")}
-              </h2>
-              <p className="text-muted-foreground mt-1">
-                {result.passed ? t("results.passedMessage") : t("results.failedMessage")}
-              </p>
-            </div>
-            <div className="text-center">
-              <div className={`text-5xl font-bold ${result.passed ? "text-emerald-600" : "text-red-600"}`}>
-                {result.score}%
+        {/* Just Submitted Banner */}
+        {justSubmitted && (
+          <Card className="mb-6 border-blue-500/50 bg-blue-500/5">
+            <CardContent className="flex items-center gap-4 p-4">
+              <CheckCircle2 className="h-6 w-6 text-blue-500" />
+              <div>
+                <p className="font-medium">{t("results.submittedSuccessfully")}</p>
+                <p className="text-sm text-muted-foreground">{t("results.submittedDesc")}</p>
               </div>
-              <Badge variant={result.passed ? "default" : "destructive"} className="mt-2">
-                {result.passed ? t("results.passed") : t("results.failed")}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Stats Grid */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card>
+        {/* Results Hidden Notice */}
+        {!showScores && (
+          <Card className="mb-6 border-amber-500/50 bg-amber-500/5">
             <CardContent className="flex items-center gap-4 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Target className="h-5 w-5 text-primary" />
-              </div>
+              <AlertCircle className="h-6 w-6 text-amber-500" />
               <div>
-                <p className="text-sm text-muted-foreground">{t("results.score")}</p>
-                <p className="text-2xl font-bold">{result.score}%</p>
+                <p className="font-medium">{t("results.resultsHidden")}</p>
+                <p className="text-sm text-muted-foreground">{t("results.resultsHiddenDesc")}</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="flex items-center gap-4 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{t("results.correct")}</p>
-                <p className="text-2xl font-bold">{result.correctAnswers}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-4 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/10">
-                <XCircle className="h-5 w-5 text-red-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{t("results.incorrect")}</p>
-                <p className="text-2xl font-bold">{result.incorrectAnswers}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-4 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                <Clock className="h-5 w-5 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{t("results.timeTaken")}</p>
-                <p className="text-2xl font-bold">{result.duration} min</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        )}
 
-        {/* Section Breakdown */}
+        {/* Success/Failure Banner - Only show if scores are visible */}
+        {showScores && (
+          <Card
+            className={`mb-8 overflow-hidden ${
+              result.isPassed
+                ? "border-emerald-500/50 bg-gradient-to-r from-emerald-500/10 to-transparent"
+                : "border-red-500/50 bg-gradient-to-r from-red-500/10 to-transparent"
+            }`}
+          >
+            <CardContent className="flex items-center gap-6 p-6">
+              <div
+                className={`flex h-20 w-20 items-center justify-center rounded-full ${
+                  result.isPassed ? "bg-emerald-500/20" : "bg-red-500/20"
+                }`}
+              >
+                {result.isPassed ? (
+                  <Trophy className="h-10 w-10 text-emerald-500" />
+                ) : (
+                  <XCircle className="h-10 w-10 text-red-500" />
+                )}
+              </div>
+              <div className="flex-1">
+                <h2 className={`text-2xl font-bold ${result.isPassed ? "text-emerald-600" : "text-red-600"}`}>
+                  {result.isPassed ? t("results.congratulations") : t("results.tryAgain")}
+                </h2>
+                <p className="text-muted-foreground mt-1">
+                  {result.isPassed ? t("results.passedMessage") : t("results.failedMessage")}
+                </p>
+              </div>
+              <div className="text-center">
+                <div className={`text-5xl font-bold ${result.isPassed ? "text-emerald-600" : "text-red-600"}`}>
+                  {result.percentage?.toFixed(0)}%
+                </div>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <Badge variant={result.isPassed ? "default" : "destructive"}>
+                    {result.isPassed ? t("results.passed") : t("results.failed")}
+                  </Badge>
+                  {result.gradeLabel && (
+                    <Badge variant="outline">{result.gradeLabel}</Badge>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Stats Grid - Only show if scores are visible */}
+        {showScores && (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+            <Card>
+              <CardContent className="flex items-center gap-4 p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <Target className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">{t("results.score")}</p>
+                  <p className="text-2xl font-bold">{result.percentage?.toFixed(0)}%</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-4 p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">{t("results.totalScore")}</p>
+                  <p className="text-2xl font-bold">{result.totalScore}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-4 p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
+                  <FileText className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">{t("results.maxScore")}</p>
+                  <p className="text-2xl font-bold">{result.maxPossibleScore}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-4 p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
+                  <Clock className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">{t("results.submittedAt")}</p>
+                  <p className="text-lg font-medium">
+                    {new Date(result.submittedAt).toLocaleDateString(language === "ar" ? "ar-SA" : "en-US", {
+                      dateStyle: "short"
+                    })}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Review Link */}
+        {result.allowReview && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                {t("results.reviewAnswers")}
+              </CardTitle>
+              <CardDescription>
+                {result.showCorrectAnswers 
+                  ? t("results.reviewWithCorrectAnswers")
+                  : t("results.reviewWithoutCorrectAnswers")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href={`/results/${attemptId}/review`}>
+                  {t("results.viewDetailedReview")}
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Submission Info */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              {t("results.sectionBreakdown")}
-            </CardTitle>
-            <CardDescription>{t("results.sectionBreakdownDesc")}</CardDescription>
+            <CardTitle>{t("results.submissionDetails")}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {result.sections.map((section, index) => {
-              const percentage = Math.round((section.score / section.totalPoints) * 100)
-              return (
-                <div key={index} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{section.title}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {section.correct}/{section.questions} correct • {section.score}/{section.totalPoints} pts
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Progress value={percentage} className="flex-1 h-2" />
-                    <span className="text-sm font-medium w-12 text-end">{percentage}%</span>
-                  </div>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">{t("results.examTitle")}</span>
+              <span className="font-medium">{getLocalizedField(result, "examTitle", language)}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">{t("results.attemptNumber")}</span>
+              <span className="font-medium">#{result.attemptNumber}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">{t("results.submittedAt")}</span>
+              <span className="font-medium">
+                {new Date(result.submittedAt).toLocaleString(language === "ar" ? "ar-SA" : "en-US")}
+              </span>
+            </div>
+            {showScores && (
+              <>
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">{t("results.score")}</span>
+                  <span className="font-medium">{result.totalScore} / {result.maxPossibleScore}</span>
                 </div>
-              )
-            })}
+                <div className="flex justify-between py-2">
+                  <span className="text-muted-foreground">{t("results.status")}</span>
+                  <Badge variant={result.isPassed ? "default" : "destructive"}>
+                    {result.isPassed ? t("results.passed") : t("results.failed")}
+                  </Badge>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
         {/* Actions */}
         <div className="flex justify-center gap-4">
-          <Button variant="outline" asChild>
+          <Button variant="outline" asChild className="bg-transparent">
             <Link href="/my-exams">
               <ArrowLeft className="h-4 w-4 me-2" />
               {t("results.backToExams")}

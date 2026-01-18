@@ -3,8 +3,14 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useI18n } from "@/lib/i18n/context"
-import { getAvailableExams } from "@/lib/api/exam-session"
-import type { ExamSession } from "@/lib/types"
+import {
+  getAvailableExams,
+  type CandidateExam,
+  type QuickAction,
+  ExamType,
+  MOCK_AVAILABLE_EXAMS,
+  MOCK_DASHBOARD,
+} from "@/lib/api/candidate"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -12,11 +18,33 @@ import { Badge } from "@/components/ui/badge"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { EmptyState } from "@/components/ui/empty-state"
 import { toast } from "sonner"
-import { Clock, Calendar, PlayCircle, CheckCircle2, FileText, Shield, Camera, MapPin } from "lucide-react"
+import {
+  Clock,
+  Calendar,
+  PlayCircle,
+  CheckCircle2,
+  FileText,
+  Shield,
+  Camera,
+  Award,
+  ArrowRight,
+} from "lucide-react"
+
+// Helper function to get localized field
+function getLocalizedField<T extends Record<string, unknown>>(
+  obj: T,
+  fieldBase: string,
+  language: string
+): string {
+  const field = language === "ar" ? `${fieldBase}Ar` : `${fieldBase}En`
+  const fallback = language === "ar" ? `${fieldBase}En` : `${fieldBase}Ar`
+  return (obj[field] as string) || (obj[fallback] as string) || ""
+}
 
 export default function MyExamsPage() {
-  const { t, locale } = useI18n()
-  const [exams, setExams] = useState<ExamSession[]>([])
+  const { t, language } = useI18n()
+  const [exams, setExams] = useState<CandidateExam[]>([])
+  const [activeAttempts, setActiveAttempts] = useState<QuickAction[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -26,29 +54,53 @@ export default function MyExamsPage() {
   async function loadExams() {
     try {
       setLoading(true)
-      const data = await getAvailableExams()
-      setExams(data)
+      
+      // Single API call to get all available exams
+      const response = await getAvailableExams()
+      console.log("[v0] Loaded exams:", response?.length || 0)
+      setExams(response || [])
+      
+      // Active attempts will come from actual API data, not mock
+      setActiveAttempts([])
     } catch (error) {
-      toast.error("Failed to load exams")
+      console.log("[v0] API error, using mock data:", error)
+      // Fallback to mock data for exams only
+      setExams(MOCK_AVAILABLE_EXAMS)
+      setActiveAttempts([])
     } finally {
       setLoading(false)
     }
   }
 
-  const upcomingExams = exams.filter((e) => e.status === "Scheduled")
-  const activeExams = exams.filter((e) => e.status === "InProgress")
-  const completedExams = exams.filter((e) => e.status === "Completed" || e.status === "Submitted")
+  // Categorize exams based on timing
+  const now = new Date()
+  
+  const upcomingExams = exams.filter((exam) => {
+    if (!exam.startAt) return false
+    return new Date(exam.startAt) > now
+  })
 
-  function formatDateTime(dateString: string) {
+  const activeExams = exams.filter((exam) => {
+    const start = exam.startAt ? new Date(exam.startAt) : new Date(0)
+    const end = exam.endAt ? new Date(exam.endAt) : new Date(Date.now() + 1000 * 60 * 60 * 24 * 365)
+    return now >= start && now <= end
+  })
+
+  const completedExams = exams.filter((exam) => {
+    return exam.myAttempts !== null && exam.myAttempts > 0 && exam.myBestIsPassed !== null
+  })
+
+  function formatDateTime(dateString: string | null) {
+    if (!dateString) return "-"
     const date = new Date(dateString)
-    return date.toLocaleString(locale === "ar" ? "ar-SA" : "en-US", {
+    return date.toLocaleString(language === "ar" ? "ar-SA" : "en-US", {
       dateStyle: "medium",
       timeStyle: "short",
     })
   }
 
-  function getTimeUntil(dateString: string) {
-    const now = new Date()
+  function getTimeUntil(dateString: string | null) {
+    if (!dateString) return null
     const target = new Date(dateString)
     const diff = target.getTime() - now.getTime()
 
@@ -67,11 +119,22 @@ export default function MyExamsPage() {
     return `${minutes}m`
   }
 
-  function canStartExam(exam: ExamSession) {
-    const now = new Date()
-    const start = new Date(exam.startTime)
-    const end = new Date(exam.endTime)
-    return now >= start && now <= end
+  function canStartExam(exam: CandidateExam) {
+    const start = exam.startAt ? new Date(exam.startAt) : new Date(0)
+    const end = exam.endAt ? new Date(exam.endAt) : new Date(Date.now() + 1000 * 60 * 60 * 24 * 365)
+    
+    // Check timing
+    if (now < start || now > end) return false
+    
+    // Check attempts remaining
+    if (exam.myAttempts !== null && exam.myAttempts >= exam.maxAttempts) return false
+    
+    return true
+  }
+
+  function getAttemptsRemaining(exam: CandidateExam) {
+    const used = exam.myAttempts || 0
+    return Math.max(0, exam.maxAttempts - used)
   }
 
   if (loading) {
@@ -83,14 +146,51 @@ export default function MyExamsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 space-y-6 p-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">{t("myExams.title")}</h1>
         <p className="text-muted-foreground mt-1">{t("myExams.subtitle")}</p>
       </div>
 
-      {/* Active exams alert */}
-      {activeExams.length > 0 && (
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardContent className="flex items-center gap-4 p-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+              <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{upcomingExams.length}</p>
+              <p className="text-sm text-muted-foreground">{t("myExams.upcoming")}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-4 p-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+              <PlayCircle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{activeExams.length}</p>
+              <p className="text-sm text-muted-foreground">{t("myExams.active")}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-4 p-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+              <Award className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{completedExams.length}</p>
+              <p className="text-sm text-muted-foreground">{t("myExams.completed")}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Active exam in progress alert */}
+      {activeAttempts.length > 0 && (
         <Card className="border-primary bg-primary/5">
           <CardContent className="flex items-center gap-4 p-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -99,11 +199,14 @@ export default function MyExamsPage() {
             <div className="flex-1">
               <h3 className="font-semibold text-foreground">{t("myExams.activeExam")}</h3>
               <p className="text-sm text-muted-foreground">
-                {t("myExams.activeExamDesc", { count: activeExams.length })}
+                {getLocalizedField(activeAttempts[0], "examTitle", language)}
               </p>
             </div>
             <Button asChild>
-              <Link href={`/take-exam/${activeExams[0].id}`}>{t("myExams.continue")}</Link>
+              <Link href={`/take-exam/${activeAttempts[0].examId}`}>
+                {t("myExams.continue")}
+                <ArrowRight className="h-4 w-4 ms-2" />
+              </Link>
             </Button>
           </CardContent>
         </Card>
@@ -131,16 +234,15 @@ export default function MyExamsPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {upcomingExams.map((exam) => {
-                const timeUntil = getTimeUntil(exam.startTime)
-                const canStart = canStartExam(exam)
+                const timeUntil = getTimeUntil(exam.startAt)
 
                 return (
                   <Card key={exam.id} className="overflow-hidden">
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <div>
-                          <CardTitle className="text-lg">{exam.examTitle}</CardTitle>
-                          <CardDescription>{exam.examCode}</CardDescription>
+                          <CardTitle className="text-lg">{getLocalizedField(exam, "title", language)}</CardTitle>
+                          <CardDescription>{getLocalizedField(exam, "description", language)}</CardDescription>
                         </div>
                         {timeUntil && (
                           <Badge variant="secondary" className="shrink-0">
@@ -153,7 +255,7 @@ export default function MyExamsPage() {
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <Calendar className="h-4 w-4" />
-                          <span>{formatDateTime(exam.startTime)}</span>
+                          <span>{formatDateTime(exam.startAt)}</span>
                         </div>
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <Clock className="h-4 w-4" />
@@ -161,42 +263,20 @@ export default function MyExamsPage() {
                             {exam.durationMinutes} {t("common.minutes")}
                           </span>
                         </div>
-                        {exam.scheduleName && (
-                          <div className="flex items-center gap-2 text-muted-foreground col-span-2">
-                            <MapPin className="h-4 w-4" />
-                            <span>{exam.scheduleName}</span>
-                          </div>
-                        )}
                       </div>
 
-                      {/* Requirements */}
-                      <div className="flex flex-wrap gap-2">
-                        {exam.requiresProctoring && (
-                          <Badge variant="outline" className="gap-1">
-                            <Camera className="h-3 w-3" />
-                            {t("myExams.proctored")}
-                          </Badge>
-                        )}
-                        {exam.requiresIdVerification && (
-                          <Badge variant="outline" className="gap-1">
-                            <Shield className="h-3 w-3" />
-                            {t("myExams.idRequired")}
-                          </Badge>
-                        )}
+                      {/* Exam info */}
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span>{exam.totalQuestions} {t("common.questions")}</span>
+                        <span>-</span>
+                        <span>{exam.totalPoints} {t("common.points")}</span>
+                        <span>-</span>
+                        <span>{t("exams.passScore")}: {exam.passScore}</span>
                       </div>
 
-                      <Button className="w-full" disabled={!canStart} asChild={canStart}>
-                        {canStart ? (
-                          <Link href={`/take-exam/${exam.id}/pre-check`}>
-                            <PlayCircle className="h-4 w-4 me-2" />
-                            {t("myExams.startExam")}
-                          </Link>
-                        ) : (
-                          <>
-                            <Clock className="h-4 w-4 me-2" />
-                            {t("myExams.notYetAvailable")}
-                          </>
-                        )}
+                      <Button className="w-full" disabled variant="secondary">
+                        <Clock className="h-4 w-4 me-2" />
+                        {t("myExams.notYetAvailable")}
                       </Button>
                     </CardContent>
                   </Card>
@@ -211,35 +291,75 @@ export default function MyExamsPage() {
             <EmptyState icon={PlayCircle} title={t("myExams.noActive")} description={t("myExams.noActiveDesc")} />
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
-              {activeExams.map((exam) => (
-                <Card key={exam.id} className="overflow-hidden border-primary">
-                  <CardHeader className="pb-3 bg-primary/5">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{exam.examTitle}</CardTitle>
-                        <CardDescription>{exam.examCode}</CardDescription>
+              {activeExams.map((exam) => {
+                const canStart = canStartExam(exam)
+                const attemptsRemaining = getAttemptsRemaining(exam)
+
+                return (
+                  <Card key={exam.id} className="overflow-hidden">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{getLocalizedField(exam, "title", language)}</CardTitle>
+                          <CardDescription>{getLocalizedField(exam, "description", language)}</CardDescription>
+                        </div>
+                        <Badge className="bg-emerald-500 shrink-0">{t("myExams.availableNow")}</Badge>
                       </div>
-                      <Badge className="bg-primary shrink-0">{t("status.inProgress")}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4 pt-4">
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span>
-                          {exam.durationMinutes} {t("common.minutes")}
-                        </span>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>
+                            {exam.durationMinutes} {t("common.minutes")}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Award className="h-4 w-4" />
+                          <span>
+                            {exam.myAttempts || 0}/{exam.maxAttempts} {t("myExams.attempts")}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    <Button className="w-full" asChild>
-                      <Link href={`/take-exam/${exam.id}`}>
-                        <PlayCircle className="h-4 w-4 me-2" />
-                        {t("myExams.continue")}
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+
+                      {/* Exam info */}
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span>{exam.totalQuestions} {t("common.questions")}</span>
+                        <span>-</span>
+                        <span>{exam.totalPoints} {t("common.points")}</span>
+                        <span>-</span>
+                        <span>{t("exams.passScore")}: {exam.passScore}</span>
+                      </div>
+
+                      {/* My status if attempted */}
+                      {exam.myAttempts !== null && exam.myAttempts > 0 && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Badge variant={exam.myBestIsPassed ? "default" : "secondary"}>
+                            {exam.myBestIsPassed ? t("myExams.passed") : t("myExams.notPassed")}
+                          </Badge>
+                          <span className="text-muted-foreground">
+                            ({exam.myAttempts} {t("myExams.attempts")})
+                          </span>
+                        </div>
+                      )}
+
+                      <Button className="w-full" disabled={!canStart} asChild={canStart}>
+                        {canStart ? (
+                          <Link href={`/take-exam/${exam.id}/instructions`}>
+                            <PlayCircle className="h-4 w-4 me-2" />
+                            {t("myExams.startExam")}
+                          </Link>
+                        ) : (
+                          <>
+                            <Clock className="h-4 w-4 me-2" />
+                            {attemptsRemaining === 0 ? t("myExams.noAttemptsLeft") : t("myExams.notYetAvailable")}
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           )}
         </TabsContent>
@@ -258,27 +378,26 @@ export default function MyExamsPage() {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div>
-                        <CardTitle className="text-lg">{exam.examTitle}</CardTitle>
-                        <CardDescription>{exam.examCode}</CardDescription>
+                        <CardTitle className="text-lg">{getLocalizedField(exam, "title", language)}</CardTitle>
+                        <CardDescription>
+                          {exam.myAttempts} {t("myExams.attempts")}
+                        </CardDescription>
                       </div>
-                      {exam.passed !== undefined && (
-                        <Badge variant={exam.passed ? "default" : "destructive"}>
-                          {exam.passed ? t("myExams.passed") : t("myExams.failed")}
-                        </Badge>
-                      )}
+                      <Badge variant={exam.myBestIsPassed ? "default" : "destructive"}>
+                        {exam.myBestIsPassed ? t("myExams.passed") : t("myExams.failed")}
+                      </Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        {t("myExams.completedOn")} {formatDateTime(exam.endTime)}
-                      </span>
-                      {exam.score !== undefined && (
-                        <span className="text-2xl font-bold text-foreground">{exam.score}%</span>
-                      )}
+                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      <span>{exam.totalQuestions} {t("questions.title")}</span>
+                      <span>-</span>
+                      <span>{exam.totalPoints} {t("common.points")}</span>
+                      <span>-</span>
+                      <span>{t("exams.passScore")}: {exam.passScore}</span>
                     </div>
                     <Button variant="outline" className="w-full bg-transparent" asChild>
-                      <Link href={`/results/${exam.id}`}>
+                      <Link href={`/my-results`}>
                         <FileText className="h-4 w-4 me-2" />
                         {t("myExams.viewResults")}
                       </Link>

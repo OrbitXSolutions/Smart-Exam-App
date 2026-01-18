@@ -77,6 +77,12 @@ export function Header({ title, subtitle }: HeaderProps) {
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium">{getLocalizedField(user, "fullName", language)}</p>
                   <p className="text-xs text-muted-foreground">{user.email}</p>
+                  <p className="text-xs text-primary font-medium">
+                    {user.role === "Admin" && t("nav.roleAdmin")}
+                    {user.role === "Instructor" && t("nav.roleInstructor")}
+                    {user.role === "Candidate" && t("nav.roleCandidate")}
+                    {user.role === "Proctor" && t("nav.roleProctor")}
+                  </p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -94,7 +100,7 @@ export function Header({ title, subtitle }: HeaderProps) {
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <HelpCircle className="mr-2 h-4 w-4" />
-                Help & Support
+                {t("nav.helpSupport")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">

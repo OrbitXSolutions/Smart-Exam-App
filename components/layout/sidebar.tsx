@@ -54,6 +54,12 @@ const candidateNavItems: NavItem[] = [
     href: "/my-exams",
     roles: [UserRole.Candidate],
   },
+  {
+    icon: BarChart3,
+    labelKey: "nav.myResults",
+    href: "/my-results",
+    roles: [UserRole.Candidate],
+  },
 ]
 
 const instructorNavItems: NavItem[] = [

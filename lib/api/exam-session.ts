@@ -4,7 +4,7 @@ import type { ExamSession, ExamAttempt, ExamSubmission, AnswerSubmission } from 
 // Get available exams for candidate
 export async function getAvailableExams(): Promise<ExamSession[]> {
   try {
-    return await apiClient.get<ExamSession[]>("/api/candidate/exams")
+    return await apiClient.get<ExamSession[]>("/Candidate/exams")
   } catch {
     // Mock data for development
     return [
@@ -53,140 +53,18 @@ export async function getAvailableExams(): Promise<ExamSession[]> {
   }
 }
 
-// Start exam attempt
+// Start exam attempt (or resume if already started)
+// Note: This will be called from the old take-exam page after redirect
+// The backend should handle resuming an existing attempt
 export async function startExamAttempt(sessionId: string): Promise<ExamAttempt> {
-  try {
-    return await apiClient.post<ExamAttempt>(`/api/candidate/exams/${sessionId}/start`)
-  } catch {
-    // Mock exam attempt
-    return {
-      id: crypto.randomUUID(),
-      sessionId,
-      startedAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 1000 * 60 * 120).toISOString(), // 2 hours
-      status: "InProgress",
-      currentSectionIndex: 0,
-      currentQuestionIndex: 0,
-      sections: [
-        {
-          id: "section-1",
-          title: "Multiple Choice",
-          description: "Select the best answer for each question",
-          questions: [
-            {
-              id: "q1",
-              questionId: "question-1",
-              order: 1,
-              points: 5,
-              body: "What is the derivative of x² + 3x + 2?",
-              type: "MultipleChoice",
-              options: [
-                { id: "opt1", text: "2x + 3", order: 1 },
-                { id: "opt2", text: "x + 3", order: 2 },
-                { id: "opt3", text: "2x + 2", order: 3 },
-                { id: "opt4", text: "x² + 3", order: 4 },
-              ],
-              answered: false,
-              flagged: false,
-            },
-            {
-              id: "q2",
-              questionId: "question-2",
-              order: 2,
-              points: 5,
-              body: "Which of the following is the integral of sin(x)?",
-              type: "MultipleChoice",
-              options: [
-                { id: "opt5", text: "-cos(x) + C", order: 1 },
-                { id: "opt6", text: "cos(x) + C", order: 2 },
-                { id: "opt7", text: "-sin(x) + C", order: 3 },
-                { id: "opt8", text: "tan(x) + C", order: 4 },
-              ],
-              answered: false,
-              flagged: false,
-            },
-            {
-              id: "q3",
-              questionId: "question-3",
-              order: 3,
-              points: 10,
-              body: "Evaluate the limit: lim(x→0) sin(x)/x",
-              type: "MultipleChoice",
-              options: [
-                { id: "opt9", text: "0", order: 1 },
-                { id: "opt10", text: "1", order: 2 },
-                { id: "opt11", text: "∞", order: 3 },
-                { id: "opt12", text: "Does not exist", order: 4 },
-              ],
-              answered: false,
-              flagged: false,
-            },
-          ],
-        },
-        {
-          id: "section-2",
-          title: "True/False",
-          description: "Determine if the statement is true or false",
-          questions: [
-            {
-              id: "q4",
-              questionId: "question-4",
-              order: 1,
-              points: 3,
-              body: "The derivative of a constant is always zero.",
-              type: "TrueFalse",
-              options: [
-                { id: "tf1", text: "True", order: 1 },
-                { id: "tf2", text: "False", order: 2 },
-              ],
-              answered: false,
-              flagged: false,
-            },
-            {
-              id: "q5",
-              questionId: "question-5",
-              order: 2,
-              points: 3,
-              body: "The integral of 1/x is ln|x| + C.",
-              type: "TrueFalse",
-              options: [
-                { id: "tf3", text: "True", order: 1 },
-                { id: "tf4", text: "False", order: 2 },
-              ],
-              answered: false,
-              flagged: false,
-            },
-          ],
-        },
-        {
-          id: "section-3",
-          title: "Short Answer",
-          description: "Provide a brief answer to each question",
-          questions: [
-            {
-              id: "q6",
-              questionId: "question-6",
-              order: 1,
-              points: 15,
-              body: "Explain the Fundamental Theorem of Calculus in your own words.",
-              type: "ShortAnswer",
-              answered: false,
-              flagged: false,
-            },
-          ],
-        },
-      ],
-      totalQuestions: 6,
-      answeredCount: 0,
-      flaggedCount: 0,
-    }
-  }
+  console.log("[v0] startExamAttempt called with sessionId:", sessionId)
+  return await apiClient.post<ExamAttempt>(`/Candidate/exams/${sessionId}/start`)
 }
 
 // Save answer
 export async function saveAnswer(attemptId: string, questionId: string, answer: AnswerSubmission): Promise<void> {
   try {
-    await apiClient.post(`/api/candidate/attempts/${attemptId}/answers/${questionId}`, answer)
+    await apiClient.post(`/Candidate/attempts/${attemptId}/answers/${questionId}`, answer)
   } catch {
     // Mock - answer saved locally
   }
@@ -195,7 +73,7 @@ export async function saveAnswer(attemptId: string, questionId: string, answer: 
 // Flag/unflag question
 export async function toggleQuestionFlag(attemptId: string, questionId: string, flagged: boolean): Promise<void> {
   try {
-    await apiClient.post(`/api/candidate/attempts/${attemptId}/questions/${questionId}/flag`, { flagged })
+    await apiClient.post(`/Candidate/attempts/${attemptId}/questions/${questionId}/flag`, { flagged })
   } catch {
     // Mock - flag saved locally
   }
@@ -204,7 +82,7 @@ export async function toggleQuestionFlag(attemptId: string, questionId: string, 
 // Submit exam
 export async function submitExam(attemptId: string): Promise<ExamSubmission> {
   try {
-    return await apiClient.post<ExamSubmission>(`/api/candidate/attempts/${attemptId}/submit`)
+    return await apiClient.post<ExamSubmission>(`/Candidate/attempts/${attemptId}/submit`)
   } catch {
     return {
       id: crypto.randomUUID(),
@@ -219,7 +97,7 @@ export async function submitExam(attemptId: string): Promise<ExamSubmission> {
 // Report incident
 export async function reportIncident(attemptId: string, incidentType: string, details?: string): Promise<void> {
   try {
-    await apiClient.post(`/api/candidate/attempts/${attemptId}/incidents`, {
+    await apiClient.post(`/Candidate/attempts/${attemptId}/incidents`, {
       type: incidentType,
       details,
       timestamp: new Date().toISOString(),
