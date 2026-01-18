@@ -246,6 +246,9 @@ export const translations = {
       pleaseAgree: "Please agree to the terms before starting",
       startExam: "Start Exam",
       noAttemptsLeft: "You have used all available attempts for this exam.",
+      accessCode: "Access Code",
+      enterAccessCode: "Enter access code",
+      examInstructions: "Exam Instructions",
     },
 
     // Instructions Page (Exam Instructions)
@@ -270,9 +273,14 @@ export const translations = {
       warning2: "Do not switch tabs or windows during the exam",
       warning3: "Ensure your device is fully charged or plugged in",
       warning4: "Once submitted, you cannot retake the exam unless allowed",
+      securityNotice: "Security Notice",
+      securityDesc1: "This exam is proctored. Your webcam and screen may be monitored.",
+      securityDesc2: "Any suspicious activity will be flagged for review.",
       agreement: "I have read and understood all instructions and agree to follow the exam rules.",
+      pleaseAgree: "Please agree to the terms before starting",
       startExam: "Start Exam",
       examInstructions: "Exam Instructions",
+      noAttemptsLeft: "Cannot Start Exam",
     },
 
     // Exam Taking
@@ -569,6 +577,8 @@ export const translations = {
       viewScores: "View exam scores",
       availableNow: "Available Now",
       attempts: "Attempts",
+      webcamRequired: "Webcam Required",
+      fullscreenRequired: "Fullscreen Required",
     },
   },
 
@@ -1046,6 +1056,8 @@ export const translations = {
       viewScores: "عرض درجات الاختبارات",
       availableNow: "متاح الآن",
       attempts: "المحاولات",
+      webcamRequired: "الكاميرا مطلوبة",
+      fullscreenRequired: "ملء الشاشة مطلوب",
     },
   
     // Exam Taking
@@ -1075,37 +1087,7 @@ export const translations = {
       captureSelfie: "التقاط صورة شخصية",
       verificationPending: "التحقق قيد الانتظار",
       verificationApproved: "تم التحقق بنجاح",
-verificationRejected: "تم رفض التحقق",
-    },
-
-    // Instructions Page
-    instructions: {
-      examInfo: "معلومات الاختبار",
-      duration: "المدة",
-      proctoring: "المراقبة",
-      proctoringEnabled: "مفعّلة",
-      beforeYouBegin: "قبل البدء",
-      readCarefully: "يرجى قراءة التعليمات التالية بعناية",
-      timeLimit: "الحد الزمني",
-      timeLimitDesc: "لديك {minutes} دقيقة لإكمال هذا الاختبار",
-      fullscreen: "وضع ملء الشاشة",
-      fullscreenDesc: "سيعمل الاختبار في وضع ملء الشاشة. الخروج قد يتم تسجيله.",
-      connection: "اتصال مستقر",
-      connectionDesc: "تأكد من وجود اتصال إنترنت مستقر طوال فترة الاختبار.",
-      answers: "حفظ الإجابات",
-      answersDesc: "يتم حفظ إجاباتك تلقائياً أثناء تقدمك.",
-      importantWarnings: "تحذيرات مهمة",
-      warning1: "لا تقم بتحديث أو إغلاق المتصفح أثناء الاختبار",
-      warning2: "لا تقم بالتبديل بين علامات التبويب أو النوافذ",
-      warning3: "تأكد من أن جهازك مشحون بالكامل أو موصول بالطاقة",
-      warning4: "بمجرد الإرسال، لا يمكنك إعادة الاختبار إلا إذا سُمح بذلك",
-      securityNotice: "إشعار أمني",
-      securityDesc1: "هذا الاختبار مراقب. قد تتم مراقبة كاميرا الويب والشاشة.",
-      securityDesc2: "سيتم الإبلاغ عن أي نشاط مشبوه للمراجعة.",
-      agreement: "لقد قرأت وفهمت جميع التعليمات وأوافق على اتباع قواعد الاختبار.",
-      pleaseAgree: "يرجى الموافقة على الشروط قبل البدء",
-      startExam: "بدء الاختبار",
-      noAttemptsLeft: "لقد استخدمت جميع المحاولات المتاحة لهذا الاختبار.",
+      verificationRejected: "تم رفض التحقق",
     },
 
     // Instructions Page (Exam Instructions)
@@ -1130,9 +1112,14 @@ verificationRejected: "تم رفض التحقق",
       warning2: "لا تقم بالتبديل بين علامات التبويب أو النوافذ أثناء الاختبار",
       warning3: "تأكد من أن جهازك مشحون بالكامل أو موصل بالكهرباء",
       warning4: "بمجرد التقديم، لا يمكنك إعادة الاختبار ما لم يُسمح لك",
+      securityNotice: "إشعار أمني",
+      securityDesc1: "هذا الاختبار مراقب. قد تتم مراقبة كاميرا الويب والشاشة.",
+      securityDesc2: "سيتم الإبلاغ عن أي نشاط مشبوه للمراجعة.",
       agreement: "لقد قرأت وفهمت جميع التعليمات وأوافق على اتباع قواعد الاختبار.",
+      pleaseAgree: "يرجى الموافقة على الشروط قبل البدء",
       startExam: "بدء الاختبار",
       examInstructions: "تعليمات الاختبار",
+      noAttemptsLeft: "لا يمكن بدء الاختبار",
     },
 
     // Exam Taking

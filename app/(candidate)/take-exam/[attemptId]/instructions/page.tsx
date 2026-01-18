@@ -32,8 +32,8 @@ function getLocalizedField<T extends Record<string, unknown>>(
 }
 
 export default function ExamInstructionsPage() {
-  const { id } = useParams<{ id: string }>()
-  const examId = Number.parseInt(id, 10)
+  const { attemptId } = useParams<{ attemptId: string }>()
+  const examId = Number.parseInt(attemptId, 10)
   const { t, language } = useI18n()
   const router = useRouter()
   const [examPreview, setExamPreview] = useState<ExamPreview | null>(null)

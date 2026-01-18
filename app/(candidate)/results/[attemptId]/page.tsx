@@ -24,8 +24,8 @@ function getLocalizedField<T extends Record<string, unknown>>(
 }
 
 export default function ResultsPage() {
-  const { id } = useParams<{ id: string }>()
-  const attemptId = Number.parseInt(id, 10)
+  const { attemptId: attemptIdParam } = useParams<{ attemptId: string }>()
+  const attemptId = Number.parseInt(attemptIdParam, 10)
   const searchParams = useSearchParams()
   const justSubmitted = searchParams.get("submitted") === "true"
   const { t, language } = useI18n()

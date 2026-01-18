@@ -69,8 +69,8 @@ function getQuestionTypeDisplayName(questionTypeName: string): string {
 }
 
 export default function ReviewPage() {
-  const { id } = useParams<{ id: string }>()
-  const attemptId = Number.parseInt(id, 10)
+  const { attemptId: attemptIdParam } = useParams<{ attemptId: string }>()
+  const attemptId = Number.parseInt(attemptIdParam, 10)
   const router = useRouter()
   const { t, language, dir } = useI18n()
   const [review, setReview] = useState<CandidateResultReview | null>(null)
