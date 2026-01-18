@@ -624,3 +624,58 @@ export async function saveAccessPolicy(
     updatedDate: null,
   }
 }
+
+// ============ EXAM SCHEDULES (MOCK) ============
+export interface ExamSchedule {
+  id: number
+  examId: number
+  name: string
+  startTime: string
+  endTime: string
+  candidateCount: number
+  status: string
+}
+
+export async function getExamSchedules(examId: string | number): Promise<ExamSchedule[]> {
+  // Schedules API not yet implemented - return empty array
+  return []
+}
+
+export interface CreateExamScheduleParams {
+  name: string
+  startTime: string
+  endTime: string
+  candidateIds?: number[]
+}
+
+export async function createExamSchedule(
+  examId: string | number,
+  data: CreateExamScheduleParams
+): Promise<ExamSchedule> {
+  // Schedules API not yet implemented - return mock
+  return {
+    id: Date.now(),
+    examId: Number(examId),
+    name: data.name,
+    startTime: data.startTime,
+    endTime: data.endTime,
+    candidateCount: data.candidateIds?.length || 0,
+    status: "Scheduled",
+  }
+}
+
+// ============ ARCHIVE EXAM ============
+export async function archiveExam(id: string | number): Promise<boolean> {
+  // Archive = toggle status to inactive
+  const response = await apiClient.post<any>(`/Assessment/exams/${id}/toggle-status`, undefined, null)
+  return response === true || (response && response.success)
+}
+
+// ============ REMOVE QUESTION FROM SECTION ============
+export async function removeQuestionFromSection(
+  examId: string | number,
+  sectionId: string | number,
+  examQuestionId: string | number
+): Promise<void> {
+  await apiClient.delete<void>(`/Assessment/exam-questions/${examQuestionId}`, undefined)
+}

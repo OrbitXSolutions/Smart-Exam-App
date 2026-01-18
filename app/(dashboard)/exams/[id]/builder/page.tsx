@@ -139,10 +139,25 @@ export default function ExamBuilderPage() {
 
     try {
       if (editingSection) {
-        await updateExamSection(id, editingSection.id, sectionForm)
+        // API takes sectionId directly, not examId + sectionId
+        await updateExamSection(editingSection.id, {
+          titleEn: sectionForm.title,
+          titleAr: sectionForm.title,
+          descriptionEn: sectionForm.description,
+          descriptionAr: sectionForm.description,
+          order: editingSection.order || 1,
+          durationMinutes: sectionForm.timeLimit || undefined,
+        })
         toast.success("Section updated")
       } else {
-        await createExamSection(id, sectionForm)
+        await createExamSection(id, {
+          titleEn: sectionForm.title,
+          titleAr: sectionForm.title,
+          descriptionEn: sectionForm.description,
+          descriptionAr: sectionForm.description,
+          order: sections.length + 1,
+          durationMinutes: sectionForm.timeLimit || undefined,
+        })
         toast.success("Section created")
       }
       setSectionDialogOpen(false)
@@ -155,7 +170,8 @@ export default function ExamBuilderPage() {
   async function handleDeleteSection() {
     if (!deleteSectionDialog) return
     try {
-      await deleteExamSection(id, deleteSectionDialog.id)
+      // API takes sectionId directly, not examId + sectionId
+      await deleteExamSection(deleteSectionDialog.id)
       toast.success("Section deleted")
       setDeleteSectionDialog(null)
       loadData()
@@ -184,9 +200,11 @@ export default function ExamBuilderPage() {
     try {
       for (const questionId of newQuestionIds) {
         const question = availableQuestions.find((q) => q.id === questionId)
-        await addQuestionToSection(id, activeSectionForQuestions, {
-          questionId,
-          points: question?.points || 1,
+        // API takes sectionId directly
+        await addQuestionToSection(activeSectionForQuestions, {
+          questionId: Number(questionId),
+          pointsOverride: question?.points || 1,
+          isRequired: true,
         })
       }
       toast.success(`Added ${newQuestionIds.length} question(s)`)
@@ -197,9 +215,10 @@ export default function ExamBuilderPage() {
     }
   }
 
-  async function handleRemoveQuestion(sectionId: string, questionId: string) {
+  async function handleRemoveQuestion(sectionId: string, examQuestionId: string) {
     try {
-      await removeQuestionFromSection(id, sectionId, questionId)
+      // API takes examQuestionId directly
+      await removeQuestionFromSection(id, sectionId, examQuestionId)
       toast.success("Question removed")
       loadData()
     } catch (error) {

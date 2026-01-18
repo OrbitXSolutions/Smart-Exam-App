@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useI18n } from "@/lib/i18n/context"
 import { ExamType } from "@/lib/types"
@@ -11,40 +11,21 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { toast } from "sonner"
-import { ArrowLeft, Save, Settings, Shield, Clock, Building2, Zap, AlertCircle, Calendar } from "lucide-react"
+import { ArrowLeft, Save, Zap, AlertCircle, Calendar, Clock, Timer, Target, RefreshCw, FileText, Settings } from "lucide-react"
 import Link from "next/link"
 import { apiClient } from "@/lib/api-client"
 
-// Mock departments - would come from API
-const MOCK_DEPARTMENTS = [
-  { id: 1, nameEn: "Information Technology", nameAr: "تقنية المعلومات" },
-  { id: 2, nameEn: "Human Resources", nameAr: "الموارد البشرية" },
-  { id: 3, nameEn: "Finance", nameAr: "المالية" },
-  { id: 4, nameEn: "Engineering", nameAr: "الهندسة" },
-  { id: 5, nameEn: "Marketing", nameAr: "التسويق" },
-]
-
-interface Department {
-  id: number
-  nameEn: string
-  nameAr: string
-}
-
 export default function CreateExamPage() {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [departments, setDepartments] = useState<Department[]>(MOCK_DEPARTMENTS)
 
-  // Form data matching API spec
+  // Form data matching API spec - no departmentId (backend fills from user)
   const [formData, setFormData] = useState({
-    departmentId: 0,
     examType: ExamType.Flex,
     titleEn: "",
     titleAr: "",
@@ -60,24 +41,6 @@ export default function CreateExamPage() {
     isActive: true,
   })
 
-  useEffect(() => {
-    fetchDepartments()
-  }, [])
-
-  async function fetchDepartments() {
-    try {
-      const response = await apiClient.get("/Lookups/departments")
-      if (response?.items && Array.isArray(response.items)) {
-        setDepartments(response.items)
-      } else if (Array.isArray(response)) {
-        setDepartments(response)
-      }
-    } catch {
-      // Use mock data on error
-      setDepartments(MOCK_DEPARTMENTS)
-    }
-  }
-
   function updateField(field: string, value: string | number | boolean) {
     setFormData((prev) => ({ ...prev, [field]: value }))
     setError(null)
@@ -92,21 +55,21 @@ export default function CreateExamPage() {
       setError(t("exams.errorTitleRequired"))
       return
     }
-    if (!formData.departmentId) {
-      setError(t("exams.errorDepartmentRequired"))
-      return
-    }
     if (formData.durationMinutes < 1 || formData.durationMinutes > 600) {
       setError(t("exams.errorDurationRange"))
+      return
+    }
+    // Fixed exam type requires startAt
+    if (formData.examType === ExamType.Fixed && !formData.startAt) {
+      setError("Start date is required for Fixed exam type")
       return
     }
 
     try {
       setLoading(true)
 
-      // Build request body per API spec
+      // Build request body per API spec - no departmentId (backend fills from current user)
       const requestBody = {
-        departmentId: formData.departmentId,
         examType: formData.examType,
         titleEn: formData.titleEn,
         titleAr: formData.titleAr || formData.titleEn,
@@ -122,11 +85,7 @@ export default function CreateExamPage() {
         isActive: formData.isActive,
       }
 
-      console.log("[v0] Creating exam with:", requestBody)
-
       const response = await apiClient.post("/Assessment/exams", requestBody)
-
-      console.log("[v0] Create exam response:", response)
 
       if (response?.success === false) {
         setError(response.message || "Failed to create exam")
@@ -151,7 +110,7 @@ export default function CreateExamPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/exams">
@@ -172,202 +131,127 @@ export default function CreateExamPage() {
         </Alert>
       )}
 
-      <form onSubmit={handleSubmit}>
-        <Tabs defaultValue="basic" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-md">
-            <TabsTrigger value="basic" className="gap-2">
-              <Settings className="h-4 w-4" />
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Basic Info - First */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-primary">
+              <FileText className="h-5 w-5" />
               {t("exams.basicInfo")}
-            </TabsTrigger>
-            <TabsTrigger value="timing" className="gap-2">
-              <Clock className="h-4 w-4" />
-              {t("exams.timing")}
-            </TabsTrigger>
-            <TabsTrigger value="security" className="gap-2">
-              <Shield className="h-4 w-4" />
-              {t("exams.security")}
-            </TabsTrigger>
-          </TabsList>
+            </CardTitle>
+            <CardDescription>{t("exams.basicInfoDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Title */}
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="titleEn">{t("exams.titleEn")} *</Label>
+                <Input
+                  id="titleEn"
+                  value={formData.titleEn}
+                  onChange={(e) => updateField("titleEn", e.target.value)}
+                  placeholder={t("exams.titleEnPlaceholder")}
+                  className="w-full h-11"
+                  maxLength={500}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="titleAr">{t("exams.titleAr")}</Label>
+                <Input
+                  id="titleAr"
+                  value={formData.titleAr}
+                  onChange={(e) => updateField("titleAr", e.target.value)}
+                  placeholder={t("exams.titleArPlaceholder")}
+                  className="w-full h-11"
+                  dir="rtl"
+                  maxLength={500}
+                />
+              </div>
+            </div>
 
-          <TabsContent value="basic" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("exams.basicInfo")}</CardTitle>
-                <CardDescription>{t("exams.basicInfoDesc")}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Department Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="department" className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-primary" />
-                    {t("exams.department")} *
-                  </Label>
-                  <Select
-                    value={formData.departmentId ? String(formData.departmentId) : ""}
-                    onValueChange={(value) => updateField("departmentId", Number(value))}
-                  >
-                    <SelectTrigger className="w-full h-11">
-                      <SelectValue placeholder={t("exams.selectDepartment")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept.id} value={String(dept.id)}>
-                          {locale === "ar" ? dept.nameAr : dept.nameEn}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            {/* Description */}
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="descriptionEn">{t("exams.descriptionEn")}</Label>
+                <Textarea
+                  id="descriptionEn"
+                  value={formData.descriptionEn}
+                  onChange={(e) => updateField("descriptionEn", e.target.value)}
+                  placeholder={t("exams.descriptionEnPlaceholder")}
+                  rows={3}
+                  maxLength={2000}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="descriptionAr">{t("exams.descriptionAr")}</Label>
+                <Textarea
+                  id="descriptionAr"
+                  value={formData.descriptionAr}
+                  onChange={(e) => updateField("descriptionAr", e.target.value)}
+                  placeholder={t("exams.descriptionArPlaceholder")}
+                  rows={3}
+                  dir="rtl"
+                  maxLength={2000}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                {/* Exam Type */}
-                <div className="space-y-3">
-                  <Label className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-primary" />
-                    {t("exams.examType")} *
-                  </Label>
-                  <RadioGroup
-                    value={String(formData.examType)}
-                    onValueChange={(value) => updateField("examType", Number(value))}
-                    className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-                  >
-                    <Label
-                      htmlFor="exam-type-flex"
-                      className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        formData.examType === ExamType.Flex
-                          ? "border-primary bg-primary/5"
-                          : "border-muted hover:border-primary/50"
-                      }`}
-                    >
-                      <RadioGroupItem value={String(ExamType.Flex)} id="exam-type-flex" className="mt-1" />
-                      <div className="space-y-1">
-                        <span className="font-medium">{t("exams.examTypeFlex")}</span>
-                        <p className="text-sm text-muted-foreground">{t("exams.examTypeFlexDesc")}</p>
-                      </div>
-                    </Label>
-                    <Label
-                      htmlFor="exam-type-fixed"
-                      className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        formData.examType === ExamType.Fixed
-                          ? "border-primary bg-primary/5"
-                          : "border-muted hover:border-primary/50"
-                      }`}
-                    >
-                      <RadioGroupItem value={String(ExamType.Fixed)} id="exam-type-fixed" className="mt-1" />
-                      <div className="space-y-1">
-                        <span className="font-medium">{t("exams.examTypeFixed")}</span>
-                        <p className="text-sm text-muted-foreground">{t("exams.examTypeFixedDesc")}</p>
-                      </div>
-                    </Label>
-                  </RadioGroup>
+        {/* Exam Type Selection - Second */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-primary">
+              <Zap className="h-5 w-5" />
+              {t("exams.examType")}
+            </CardTitle>
+            <CardDescription>{t("exams.examTypeDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <RadioGroup
+              value={String(formData.examType)}
+              onValueChange={(value) => updateField("examType", Number(value))}
+              className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+            >
+              <Label
+                htmlFor="exam-type-flex"
+                className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  formData.examType === ExamType.Flex
+                    ? "border-primary bg-primary/5"
+                    : "border-muted hover:border-primary/50"
+                }`}
+              >
+                <RadioGroupItem value={String(ExamType.Flex)} id="exam-type-flex" className="mt-1" />
+                <div className="space-y-1">
+                  <span className="font-medium">{t("exams.examTypeFlex")}</span>
+                  <p className="text-sm text-muted-foreground">{t("exams.examTypeFlexDesc")}</p>
                 </div>
+              </Label>
+              <Label
+                htmlFor="exam-type-fixed"
+                className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  formData.examType === ExamType.Fixed
+                    ? "border-primary bg-primary/5"
+                    : "border-muted hover:border-primary/50"
+                }`}
+              >
+                <RadioGroupItem value={String(ExamType.Fixed)} id="exam-type-fixed" className="mt-1" />
+                <div className="space-y-1">
+                  <span className="font-medium">{t("exams.examTypeFixed")}</span>
+                  <p className="text-sm text-muted-foreground">{t("exams.examTypeFixedDesc")}</p>
+                </div>
+              </Label>
+            </RadioGroup>
 
-                {/* Title (English) */}
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="titleEn">{t("exams.titleEn")} *</Label>
-                    <Input
-                      id="titleEn"
-                      value={formData.titleEn}
-                      onChange={(e) => updateField("titleEn", e.target.value)}
-                      placeholder={t("exams.titleEnPlaceholder")}
-                      className="w-full h-11"
-                      maxLength={500}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="titleAr">{t("exams.titleAr")}</Label>
-                    <Input
-                      id="titleAr"
-                      value={formData.titleAr}
-                      onChange={(e) => updateField("titleAr", e.target.value)}
-                      placeholder={t("exams.titleArPlaceholder")}
-                      className="w-full h-11"
-                      dir="rtl"
-                      maxLength={500}
-                    />
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="descriptionEn">{t("exams.descriptionEn")}</Label>
-                    <Textarea
-                      id="descriptionEn"
-                      value={formData.descriptionEn}
-                      onChange={(e) => updateField("descriptionEn", e.target.value)}
-                      placeholder={t("exams.descriptionEnPlaceholder")}
-                      rows={3}
-                      maxLength={2000}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="descriptionAr">{t("exams.descriptionAr")}</Label>
-                    <Textarea
-                      id="descriptionAr"
-                      value={formData.descriptionAr}
-                      onChange={(e) => updateField("descriptionAr", e.target.value)}
-                      placeholder={t("exams.descriptionArPlaceholder")}
-                      rows={3}
-                      dir="rtl"
-                      maxLength={2000}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("exams.displayOptions")}</CardTitle>
-                <CardDescription>{t("exams.displayOptionsDesc")}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("exams.shuffleQuestions")}</Label>
-                    <p className="text-sm text-muted-foreground">{t("exams.shuffleQuestionsDesc")}</p>
-                  </div>
-                  <Switch
-                    checked={formData.shuffleQuestions}
-                    onCheckedChange={(checked) => updateField("shuffleQuestions", checked)}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("exams.shuffleOptions")}</Label>
-                    <p className="text-sm text-muted-foreground">{t("exams.shuffleOptionsDesc")}</p>
-                  </div>
-                  <Switch
-                    checked={formData.shuffleOptions}
-                    onCheckedChange={(checked) => updateField("shuffleOptions", checked)}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("exams.isActive")}</Label>
-                    <p className="text-sm text-muted-foreground">{t("exams.isActiveDesc")}</p>
-                  </div>
-                  <Switch checked={formData.isActive} onCheckedChange={(checked) => updateField("isActive", checked)} />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="timing" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("exams.timingSettings")}</CardTitle>
-                <CardDescription>{t("exams.timingSettingsDesc")}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Start/End Date */}
+            {/* Fixed Exam Only - Show Start Time */}
+            {formData.examType === ExamType.Fixed && (
+              <div className="pt-4 border-t space-y-4">
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="startAt" className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-primary" />
-                      {t("exams.startAt")}
+                      {t("exams.startAt")} *
                     </Label>
                     <Input
                       id="startAt"
@@ -375,11 +259,12 @@ export default function CreateExamPage() {
                       value={formData.startAt}
                       onChange={(e) => updateField("startAt", e.target.value)}
                       className="w-full h-11"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="endAt" className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-primary" />
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
                       {t("exams.endAt")}
                     </Label>
                     <Input
@@ -391,75 +276,121 @@ export default function CreateExamPage() {
                     />
                   </div>
                 </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="duration">{t("exams.durationMinutes")} *</Label>
-                    <Input
-                      id="duration"
-                      type="number"
-                      min="1"
-                      max="600"
-                      value={formData.durationMinutes}
-                      onChange={(e) => updateField("durationMinutes", Number.parseInt(e.target.value) || 60)}
-                      className="w-full h-11"
-                    />
-                    <p className="text-xs text-muted-foreground">{t("exams.durationRange")}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="passingScore">{t("exams.passingScorePercent")} *</Label>
-                    <Input
-                      id="passingScore"
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={formData.passScore}
-                      onChange={(e) => updateField("passScore", Number.parseInt(e.target.value) || 70)}
-                      className="w-full h-11"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="maxAttempts">{t("exams.maxAttempts")} *</Label>
-                    <Input
-                      id="maxAttempts"
-                      type="number"
-                      min="0"
-                      value={formData.maxAttempts}
-                      onChange={(e) => updateField("maxAttempts", Number.parseInt(e.target.value) || 1)}
-                      className="w-full h-11"
-                    />
-                    <p className="text-xs text-muted-foreground">{t("exams.maxAttemptsHint")}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+        {/* Timing & Scoring */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-primary">
+              <Clock className="h-5 w-5" />
+              {t("exams.timingSettings")}
+            </CardTitle>
+            <CardDescription>{t("exams.timingSettingsDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="duration" className="flex items-center gap-2">
+                  <Timer className="h-4 w-4 text-muted-foreground" />
+                  {t("exams.durationMinutes")} *
+                </Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  min="1"
+                  max="600"
+                  value={formData.durationMinutes}
+                  onChange={(e) => updateField("durationMinutes", Number.parseInt(e.target.value) || 60)}
+                  className="w-full h-11"
+                />
+                <p className="text-xs text-muted-foreground">{t("exams.durationRange")}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="passingScore" className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-muted-foreground" />
+                  {t("exams.passingScorePercent")} *
+                </Label>
+                <Input
+                  id="passingScore"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={formData.passScore}
+                  onChange={(e) => updateField("passScore", Number.parseInt(e.target.value) || 70)}
+                  className="w-full h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maxAttempts" className="flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                  {t("exams.maxAttempts")}
+                </Label>
+                <Input
+                  id="maxAttempts"
+                  type="number"
+                  min="0"
+                  value={formData.maxAttempts}
+                  onChange={(e) => updateField("maxAttempts", Number.parseInt(e.target.value) || 1)}
+                  className="w-full h-11"
+                />
+                <p className="text-xs text-muted-foreground">{t("exams.maxAttemptsHint")}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          <TabsContent value="security" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("exams.securitySettings")}</CardTitle>
-                <CardDescription>{t("exams.securitySettingsDesc")}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{t("exams.securityConfiguredLater")}</AlertDescription>
-                </Alert>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        {/* Display Options */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-primary">
+              <Settings className="h-5 w-5" />
+              {t("exams.displayOptions")}
+            </CardTitle>
+            <CardDescription>{t("exams.displayOptionsDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>{t("exams.shuffleQuestions")}</Label>
+                <p className="text-sm text-muted-foreground">{t("exams.shuffleQuestionsDesc")}</p>
+              </div>
+              <Switch
+                checked={formData.shuffleQuestions}
+                onCheckedChange={(checked) => updateField("shuffleQuestions", checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>{t("exams.shuffleOptions")}</Label>
+                <p className="text-sm text-muted-foreground">{t("exams.shuffleOptionsDesc")}</p>
+              </div>
+              <Switch
+                checked={formData.shuffleOptions}
+                onCheckedChange={(checked) => updateField("shuffleOptions", checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>{t("exams.isActive")}</Label>
+                <p className="text-sm text-muted-foreground">{t("exams.isActiveDesc")}</p>
+              </div>
+              <Switch checked={formData.isActive} onCheckedChange={(checked) => updateField("isActive", checked)} />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Error before submit */}
         {error && (
-          <Alert variant="destructive" className="mt-6">
+          <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <div className="flex justify-end gap-3 mt-6">
+        <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" asChild>
             <Link href="/exams">{t("common.cancel")}</Link>
           </Button>

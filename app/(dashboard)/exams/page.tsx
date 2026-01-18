@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useI18n } from "@/lib/i18n/context"
 import type { Exam } from "@/lib/types"
+import { getExams, deleteExam, publishExam, unpublishExam } from "@/lib/api/exams"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -27,6 +28,7 @@ import {
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { EmptyState } from "@/components/ui/empty-state"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { toast } from "sonner"
 import {
@@ -151,28 +153,79 @@ function getExamStatus(exam: Exam): string {
 
 export default function ExamsPage() {
   const { t, dir, language } = useI18n()
-  const [exams, setExams] = useState<Exam[]>(MOCK_EXAMS)
+  const [exams, setExams] = useState<Exam[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [examToDelete, setExamToDelete] = useState<Exam | null>(null)
+  const [actionLoading, setActionLoading] = useState<number | null>(null)
 
-  function handlePublish(exam: Exam) {
-    setExams(exams.map((e) => (e.id === exam.id ? { ...e, status: "Published", isPublished: true } : e)))
-    toast.success("Exam published successfully")
+  useEffect(() => {
+    fetchExams()
+  }, [])
+
+  async function fetchExams() {
+    try {
+      setLoading(true)
+      const response = await getExams()
+      console.log("[v0] Exams API response:", response)
+      if (response?.items && Array.isArray(response.items)) {
+        setExams(response.items)
+      } else if (Array.isArray(response)) {
+        setExams(response)
+      } else {
+        // Fallback to mock data if API fails
+        setExams(MOCK_EXAMS)
+      }
+    } catch (error) {
+      console.log("[v0] Exams API error, using mock data:", error)
+      setExams(MOCK_EXAMS)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  function handleArchive(exam: Exam) {
-    setExams(exams.map((e) => (e.id === exam.id ? { ...e, status: "Archived", isActive: false } : e)))
-    toast.success("Exam archived successfully")
+  async function handlePublish(exam: Exam) {
+    try {
+      setActionLoading(exam.id)
+      await publishExam(exam.id)
+      toast.success(t("exams.publishSuccess"))
+      fetchExams()
+    } catch (error) {
+      toast.error(t("exams.publishError"))
+    } finally {
+      setActionLoading(null)
+    }
   }
 
-  function handleDelete() {
+  async function handleArchive(exam: Exam) {
+    try {
+      setActionLoading(exam.id)
+      await unpublishExam(exam.id)
+      toast.success(t("exams.archiveSuccess"))
+      fetchExams()
+    } catch (error) {
+      toast.error(t("exams.archiveError"))
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleDelete() {
     if (!examToDelete) return
-    setExams(exams.filter((e) => e.id !== examToDelete.id))
-    toast.success("Exam deleted successfully")
-    setDeleteDialogOpen(false)
-    setExamToDelete(null)
+    try {
+      setActionLoading(examToDelete.id)
+      await deleteExam(examToDelete.id)
+      toast.success(t("exams.deleteSuccess"))
+      setDeleteDialogOpen(false)
+      setExamToDelete(null)
+      fetchExams()
+    } catch (error) {
+      toast.error(t("exams.deleteError"))
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   const filteredExams = exams.filter((exam) => {
@@ -185,6 +238,14 @@ export default function ExamsPage() {
     const matchesStatus = statusFilter === "all" || status === statusFilter
     return matchesSearch && matchesStatus
   })
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <LoadingSpinner size="lg" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -228,19 +289,60 @@ export default function ExamsPage() {
         </CardHeader>
         <CardContent className="p-0">
           {filteredExams.length === 0 ? (
-            <EmptyState
-              icon={FileText}
-              title={t("exams.noExams")}
-              description={t("exams.noExamsDesc")}
-              action={
-                <Button asChild>
-                  <Link href="/exams/create">
-                    <Plus className="h-4 w-4 me-2" />
-                    {t("exams.create")}
-                  </Link>
-                </Button>
-              }
-            />
+            <div className="py-16 px-6">
+              <div className="max-w-2xl mx-auto text-center space-y-8">
+                {/* Icon */}
+                <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <FileText className="h-8 w-8 text-primary" />
+                </div>
+                
+                {/* Title & Description */}
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold text-foreground">{t("exams.noExams")}</h3>
+                  <p className="text-muted-foreground">{t("exams.noExamsDesc")}</p>
+                </div>
+
+                {/* How It Works Steps */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-start">
+                  <div className="p-4 rounded-lg border bg-card">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center mb-3">1</div>
+                    <h4 className="font-medium text-foreground mb-1">{t("exams.emptyStateStep1")}</h4>
+                    <p className="text-sm text-muted-foreground">{t("exams.emptyStateStep1Desc")}</p>
+                  </div>
+                  <div className="p-4 rounded-lg border bg-card">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center mb-3">2</div>
+                    <h4 className="font-medium text-foreground mb-1">{t("exams.emptyStateStep2")}</h4>
+                    <p className="text-sm text-muted-foreground">{t("exams.emptyStateStep2Desc")}</p>
+                  </div>
+                  <div className="p-4 rounded-lg border bg-card">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center mb-3">3</div>
+                    <h4 className="font-medium text-foreground mb-1">{t("exams.emptyStateStep3")}</h4>
+                    <p className="text-sm text-muted-foreground">{t("exams.emptyStateStep3Desc")}</p>
+                  </div>
+                  <div className="p-4 rounded-lg border bg-card">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center mb-3">4</div>
+                    <h4 className="font-medium text-foreground mb-1">{t("exams.emptyStateStep4")}</h4>
+                    <p className="text-sm text-muted-foreground">{t("exams.emptyStateStep4Desc")}</p>
+                  </div>
+                </div>
+
+                {/* CTA Buttons */}
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <Button asChild size="lg">
+                    <Link href="/exams/create">
+                      <Plus className="h-4 w-4 me-2" />
+                      {t("exams.create")}
+                    </Link>
+                  </Button>
+                  <Button variant="outline" size="lg" asChild>
+                    <a href="https://docs.smartexam.com/getting-started" target="_blank" rel="noopener noreferrer">
+                      <Eye className="h-4 w-4 me-2" />
+                      {t("exams.watchTutorial")}
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="rounded-md border">
               <Table>

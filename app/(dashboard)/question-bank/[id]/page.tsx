@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import { useI18n } from "@/lib/i18n/context"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,11 @@ import type { Question } from "@/lib/types"
 import { ArrowLeft, Edit, Check, X, FileImage, Calendar, Clock, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
+// Dynamically import the create page component
+const CreateQuestionPage = dynamic(() => import("../create/page"), {
+  loading: () => <PageLoader />,
+})
+
 export default function QuestionDetailPage() {
   const params = useParams()
   const questionId = params.id as string
@@ -38,13 +44,20 @@ export default function QuestionDetailPage() {
 
   const numericId = Number(questionId)
   const isValidId = !isNaN(numericId) && numericId > 0
+  const isCreateRoute = questionId === "create"
 
   useEffect(() => {
-    if (questionId === "create" || !isValidId) {
+    if (isCreateRoute || !isValidId) {
+      setIsLoading(false)
       return
     }
     fetchQuestion()
-  }, [questionId])
+  }, [questionId, isCreateRoute, isValidId])
+
+  // If the ID is "create", render the create page directly
+  if (isCreateRoute) {
+    return <CreateQuestionPage />
+  }
 
   const fetchQuestion = async () => {
     try {
@@ -73,6 +86,10 @@ export default function QuestionDetailPage() {
       toast.error("Failed to delete question")
     }
     setIsDeleting(false)
+  }
+
+  if (questionId === "create") {
+    return <CreateQuestionPage />
   }
 
   if (isLoading) {
