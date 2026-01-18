@@ -56,16 +56,44 @@ function getLocalizedField<T extends Record<string, unknown>>(
   return (obj[field] as string) || (obj[fallback] as string) || ""
 }
 
+// Question type constants for matching both ID and name
+const QUESTION_TYPES = {
+  MCQ_SINGLE: { id: 1, names: ["MCQ_Single", "MCQ Single Choice", "SingleChoice", "Multiple Choice"] },
+  MCQ_MULTI: { id: 2, names: ["MCQ_Multi", "MCQ Multiple Choice", "MCQ_Multiple", "MultipleChoice", "Multiple Select"] },
+  TRUE_FALSE: { id: 3, names: ["TrueFalse", "True_False", "True/False"] },
+  SHORT_ANSWER: { id: 4, names: ["ShortAnswer", "Short_Answer", "Short Answer"] },
+  ESSAY: { id: 5, names: ["Essay"] },
+  NUMERIC: { id: 6, names: ["Numeric"] },
+}
+
+// Helper function to detect question type from ID or name
+function getQuestionType(questionTypeId: number, questionTypeName: string): keyof typeof QUESTION_TYPES {
+  // First try by ID
+  for (const [key, value] of Object.entries(QUESTION_TYPES)) {
+    if (value.id === questionTypeId) return key as keyof typeof QUESTION_TYPES
+  }
+  // Then try by name
+  for (const [key, value] of Object.entries(QUESTION_TYPES)) {
+    if (value.names.some(n => n.toLowerCase() === questionTypeName?.toLowerCase())) {
+      return key as keyof typeof QUESTION_TYPES
+    }
+  }
+  // Default fallback
+  return "MCQ_SINGLE"
+}
+
 // Helper function to get question type display name
 function getQuestionTypeDisplayName(questionTypeId: number, questionTypeName: string): string {
-  const typeNames: Record<number, string> = {
-    1: "Multiple Choice",
-    2: "Multiple Select",
-    3: "True/False",
-    4: "Short Answer",
-    5: "Essay",
+  const typeDisplayNames: Record<string, string> = {
+    MCQ_SINGLE: "Multiple Choice",
+    MCQ_MULTI: "Multiple Select",
+    TRUE_FALSE: "True/False",
+    SHORT_ANSWER: "Short Answer",
+    ESSAY: "Essay",
+    NUMERIC: "Numeric",
   }
-  return typeNames[questionTypeId] || questionTypeName
+  const type = getQuestionType(questionTypeId, questionTypeName)
+  return typeDisplayNames[type] || questionTypeName
 }
 
 export default function TakeExamPage() {
@@ -509,12 +537,14 @@ export default function TakeExamPage() {
   const currentSectionTimer = currentSection ? sectionTimers[currentSection.sectionId] : null
   const isSectionWarningTime = currentSectionTimer !== null && currentSectionTimer !== undefined && currentSectionTimer < 60
 
-  // Render question content
+  // Render question content based on question type (supports both ID and name matching)
   function renderQuestionContent(question: AttemptQuestionDto) {
+    const questionType = getQuestionType(question.questionTypeId, question.questionTypeName)
+    
     return (
       <div className="space-y-3">
-        {/* Single Choice (MCQ) - questionTypeId 1 */}
-        {question.questionTypeId === 1 && (
+        {/* Single Choice (MCQ_Single) - Radio buttons */}
+        {questionType === "MCQ_SINGLE" && (
           <RadioGroup
             value={answers[question.questionId]?.selectedOptionIds?.[0]?.toString() || ""}
             onValueChange={(value) =>
@@ -538,8 +568,8 @@ export default function TakeExamPage() {
           </RadioGroup>
         )}
 
-        {/* Multiple Select (MCQ Multi) - questionTypeId 2 */}
-        {question.questionTypeId === 2 && (
+        {/* Multiple Select (MCQ_Multi) - Checkboxes */}
+        {questionType === "MCQ_MULTI" && (
           <div className="space-y-2">
             {question.options?.map((option) => {
               const selectedIds = answers[question.questionId]?.selectedOptionIds || []
@@ -572,8 +602,8 @@ export default function TakeExamPage() {
           </div>
         )}
 
-        {/* True/False - questionTypeId 3 */}
-        {question.questionTypeId === 3 && (
+        {/* True/False - Radio buttons (2 options) */}
+        {questionType === "TRUE_FALSE" && (
           <RadioGroup
             value={answers[question.questionId]?.selectedOptionIds?.[0]?.toString() || ""}
             onValueChange={(value) =>
@@ -597,8 +627,8 @@ export default function TakeExamPage() {
           </RadioGroup>
         )}
 
-        {/* Short Answer - questionTypeId 4 */}
-        {question.questionTypeId === 4 && (
+        {/* Short Answer - Text input (smaller) */}
+        {questionType === "SHORT_ANSWER" && (
           <Textarea
             placeholder={t("exam.typeAnswer")}
             value={answers[question.questionId]?.textAnswer || ""}
@@ -613,8 +643,8 @@ export default function TakeExamPage() {
           />
         )}
 
-        {/* Essay - questionTypeId 5 */}
-        {question.questionTypeId === 5 && (
+        {/* Essay - Larger textarea for long answers */}
+        {questionType === "ESSAY" && (
           <Textarea
             placeholder={t("exam.typeAnswer")}
             value={answers[question.questionId]?.textAnswer || ""}
@@ -625,6 +655,22 @@ export default function TakeExamPage() {
               })
             }
             rows={8}
+            className="resize-none"
+          />
+        )}
+
+        {/* Numeric - Number input */}
+        {questionType === "NUMERIC" && (
+          <Textarea
+            placeholder={t("exam.typeAnswer")}
+            value={answers[question.questionId]?.textAnswer || ""}
+            onChange={(e) =>
+              handleAnswerChange(question.questionId, {
+                questionId: question.questionId,
+                textAnswer: e.target.value,
+              })
+            }
+            rows={2}
             className="resize-none"
           />
         )}

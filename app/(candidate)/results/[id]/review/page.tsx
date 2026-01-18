@@ -27,22 +27,45 @@ function getLocalizedField<T extends Record<string, unknown>>(
   return (obj[field] as string) || (obj[fallback] as string) || ""
 }
 
+// Question type mapping for display names (supports various backend naming conventions)
+const QUESTION_TYPE_DISPLAY: Record<string, string> = {
+  // MCQ Single variants
+  "MCQ_Single": "Multiple Choice",
+  "MCQ Single Choice": "Multiple Choice",
+  "SingleChoice": "Multiple Choice",
+  "Multiple Choice": "Multiple Choice",
+  // MCQ Multi variants
+  "MCQ_Multi": "Multiple Select",
+  "MCQ_Multiple": "Multiple Select",
+  "MCQ Multiple Choice": "Multiple Select",
+  "MultipleChoice": "Multiple Select",
+  "Multiple Select": "Multiple Select",
+  // True/False variants
+  "TrueFalse": "True/False",
+  "True_False": "True/False",
+  "True/False": "True/False",
+  // Short Answer variants
+  "ShortAnswer": "Short Answer",
+  "Short_Answer": "Short Answer",
+  "Short Answer": "Short Answer",
+  // Essay
+  "Essay": "Essay",
+  // Numeric
+  "Numeric": "Numeric",
+}
+
 // Helper function to get question type display name
 function getQuestionTypeDisplayName(questionTypeName: string): string {
-  const typeNames: Record<string, string> = {
-    "MCQ Single Choice": "Multiple Choice",
-    "MCQ Multiple Choice": "Multiple Select",
-    "MCQ_Single": "Multiple Choice",
-    "MCQ_Multi": "Multiple Select",
-    "SingleChoice": "Multiple Choice",
-    "MultipleChoice": "Multiple Select",
-    "TrueFalse": "True/False",
-    "True/False": "True/False",
-    "ShortAnswer": "Short Answer",
-    "Short Answer": "Short Answer",
-    "Essay": "Essay",
+  // Try exact match first
+  if (QUESTION_TYPE_DISPLAY[questionTypeName]) {
+    return QUESTION_TYPE_DISPLAY[questionTypeName]
   }
-  return typeNames[questionTypeName] || questionTypeName
+  // Try case-insensitive match
+  const lowerName = questionTypeName?.toLowerCase()
+  for (const [key, value] of Object.entries(QUESTION_TYPE_DISPLAY)) {
+    if (key.toLowerCase() === lowerName) return value
+  }
+  return questionTypeName
 }
 
 export default function ReviewPage() {
